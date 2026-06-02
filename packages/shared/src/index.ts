@@ -6,3 +6,4 @@ export * from './biddingRules.js';
 export * from './scoring.js';
 export * from './cardPlay.js';
 export * from './sortHand.js';
+export * from './canRevealHand.js';

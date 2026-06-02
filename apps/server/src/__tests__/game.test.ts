@@ -1200,18 +1200,18 @@ describe('dealRound — trump determination', () => {
     expect(ar.trumpSuit).toBeNull();
   });
 
-  it('misere round: both trumpCard and trumpSuit are null', () => {
+  it('misere round: has trump card and trump suit before playing', () => {
     const room = makeRoomWithScores(4, 8, 'misere');
     const ar = room.activeRound!;
-    expect(ar.trumpCard).toBeNull();
-    expect(ar.trumpSuit).toBeNull();
+    expect(ar.trumpCard).not.toBeNull();
+    expect(ar.trumpSuit).toBe(ar.trumpCard!.isJoker ? null : ar.trumpCard!.suit);
   });
 
-  it('golden round: both trumpCard and trumpSuit are null', () => {
+  it('golden round: has trump card and trump suit before playing', () => {
     const room = makeRoomWithScores(4, 8, 'golden');
     const ar = room.activeRound!;
-    expect(ar.trumpCard).toBeNull();
-    expect(ar.trumpSuit).toBeNull();
+    expect(ar.trumpCard).not.toBeNull();
+    expect(ar.trumpSuit).toBe(ar.trumpCard!.isJoker ? null : ar.trumpCard!.suit);
   });
 
   it('4 players × 8 cards: trump card is the kitty card (not in any hand)', () => {
@@ -1258,5 +1258,86 @@ describe('dealRound — trump determination', () => {
     const room = makeRoomWithScores(4, 8, 'dark');
     const ar = room.activeRound!;
     expect(ar.trumpCard).not.toBeNull();
+  });
+
+  it('misere round: starts in playing phase (no bidding)', () => {
+    const room = makeRoomWithScores(4, 8, 'misere');
+    expect(room.activeRound!.phase).toBe('playing');
+  });
+
+  it('golden round: starts in playing phase (no bidding)', () => {
+    const room = makeRoomWithScores(4, 8, 'golden');
+    expect(room.activeRound!.phase).toBe('playing');
+  });
+});
+
+// ─── Dark bid mechanics ───────────────────────────────────────────────────────
+
+describe('placeBid — dark flag', () => {
+  it('stores isDark=true in playerDarkFlags when dark bid submitted', () => {
+    const room = makeRoom(3, 5);
+    placeBid(room, 'p1', 2, true);
+    expect(room.activeRound!.playerDarkFlags['p1']).toBe(true);
+  });
+
+  it('stores isDark=false in playerDarkFlags when non-dark bid submitted', () => {
+    const room = makeRoom(3, 5);
+    placeBid(room, 'p1', 2, false);
+    expect(room.activeRound!.playerDarkFlags['p1']).toBe(false);
+  });
+
+  it('default isDark=false when param omitted', () => {
+    const room = makeRoom(3, 5);
+    placeBid(room, 'p1', 2);
+    expect(room.activeRound!.playerDarkFlags['p1']).toBe(false);
+  });
+});
+
+describe('finishRound — dark bid scoring', () => {
+  it('normal round dark player score is multiplied by 2', () => {
+    const room = makeRoomWithScores(3, 5, 'normal');
+    room.activeRound!.playerDarkFlags['p1'] = true;
+    // p1: bid=2 actual=2 → base +20 → dark ×2 = +40
+    // p2: bid=2 actual=0 → base -20 → not dark = -20
+    // p3: bid=0 actual=3 → base +3 → not dark = +3
+    forceComplete(room, { p1: 2, p2: 2, p3: 0 }, { p1: 2, p2: 0, p3: 3 });
+    finishRound(room);
+    const gs = room.gameSheet!;
+    expect(gs.scores.find(s => s.playerId === 'p1')!.scores[0]).toBe(40);
+    expect(gs.scores.find(s => s.playerId === 'p2')!.scores[0]).toBe(-20);
+    expect(gs.scores.find(s => s.playerId === 'p3')!.scores[0]).toBe(3);
+  });
+
+  it('normal round non-dark score is not multiplied', () => {
+    const room = makeRoomWithScores(3, 5, 'normal');
+    // no dark flags set
+    forceComplete(room, { p1: 2, p2: 2, p3: 0 }, { p1: 2, p2: 0, p3: 3 });
+    finishRound(room);
+    const gs = room.gameSheet!;
+    expect(gs.scores.find(s => s.playerId === 'p1')!.scores[0]).toBe(20);
+    expect(gs.scores.find(s => s.playerId === 'p2')!.scores[0]).toBe(-20);
+    expect(gs.scores.find(s => s.playerId === 'p3')!.scores[0]).toBe(3);
+  });
+
+  it('dark round type (Т) scores all players ×2 via computeScore (not playerDarkFlags)', () => {
+    const room = makeRoomWithScores(3, 5, 'dark');
+    // p1: bid=2 actual=2 → +20 ×2 = +40 (from computeScore)
+    forceComplete(room, { p1: 2, p2: 2, p3: 0 }, { p1: 2, p2: 0, p3: 3 });
+    finishRound(room);
+    const gs = room.gameSheet!;
+    expect(gs.scores.find(s => s.playerId === 'p1')!.scores[0]).toBe(40);
+    expect(gs.scores.find(s => s.playerId === 'p2')!.scores[0]).toBe(-40);
+    expect(gs.scores.find(s => s.playerId === 'p3')!.scores[0]).toBe(6);
+  });
+
+  it('playerDarkFlags dark multiplier does not stack on top of dark round type ×2', () => {
+    const room = makeRoomWithScores(3, 5, 'dark');
+    // Even if playerDarkFlags is set, only computeScore's ×2 applies (no double-multiply)
+    room.activeRound!.playerDarkFlags['p1'] = true;
+    forceComplete(room, { p1: 2, p2: 2, p3: 0 }, { p1: 2, p2: 0, p3: 3 });
+    finishRound(room);
+    const gs = room.gameSheet!;
+    // Should still be +40, not +80 (dark round type handles multiplier; playerDarkFlags only for 'normal')
+    expect(gs.scores.find(s => s.playerId === 'p1')!.scores[0]).toBe(40);
   });
 });

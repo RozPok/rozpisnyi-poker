@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { BidResult, Card, GameRoom, JokerDeclaration, LastTrick, PlayResult, Suit } from '@rozpisnyi-poker/shared';
-import { getLegalBids, getLegalCards, sortHand, TRUMP_SUIT_LABELS } from '@rozpisnyi-poker/shared';
+import { canRevealHand, getLegalBids, getLegalCards, sortHand, TRUMP_SUIT_LABELS } from '@rozpisnyi-poker/shared';
 import { socket } from '../socket.ts';
 
 interface Props {
@@ -22,10 +22,16 @@ export default function GameTable({ room, myId, hand, onCardPlayed }: Props) {
 
 function BiddingPhase({ room, myId, hand }: Props) {
   const ar = room.activeRound!;
+  const roundDef = room.gameSheet?.rounds[ar.roundIndex];
+  const isDarkRound  = roundDef?.type === 'dark';
+  const isNormalRound = roundDef?.type === 'normal';
+
   const isMyTurn = ar.currentTurnPlayerId === myId;
   const [selected, setSelected] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  // Per-turn dark choice (null = not yet chosen, only relevant for normal rounds)
+  const [darkChoice, setDarkChoice] = useState<'dark' | 'not-dark' | null>(null);
 
   const playerScore = room.gameSheet?.scores.find(s => s.playerId === myId);
   const bidHistory: (number | null)[] = playerScore
@@ -38,16 +44,23 @@ function BiddingPhase({ room, myId, hand }: Props) {
     ? getLegalBids(ar.cardsPerPlayer, currentTotal, isLastBidder, bidHistory)
     : [];
 
+  // canRevealHand covers all cases: dark round, waiting-for-turn peeking, per-player choice
+  const showHand    = canRevealHand(roundDef?.type ?? 'normal', myId, ar.bids, isMyTurn, darkChoice);
+  // Bid input shown when it is my turn AND (dark round always, or normal after choice made)
+  const showBidInput = isMyTurn && (isDarkRound || (isNormalRound && darkChoice !== null));
+
   function handleBid() {
     if (!isMyTurn || submitting || selected === null) return;
     setSubmitting(true);
     setError('');
-    socket.emit('bid:submit', selected, (result: BidResult) => {
+    const isDark = isDarkRound || darkChoice === 'dark';
+    socket.emit('bid:submit', selected, isDark, (result: BidResult) => {
       setSubmitting(false);
       if (!result.ok) {
         setError(result.error);
       } else {
         setSelected(null);
+        setDarkChoice(null);
       }
     });
   }
@@ -59,6 +72,11 @@ function BiddingPhase({ room, myId, hand }: Props) {
     <div className="game-table">
       <div className="bidding-header">
         <RoundInfoPanel room={room} />
+        {isDarkRound && (
+          <div className="dark-round-banner">
+            Темна гра — замовлення без перегляду карт
+          </div>
+        )}
         <div className={`turn-banner${isMyTurn ? ' turn-banner--mine' : ''}`}>
           {isMyTurn ? 'Ваша ставка!' : `Ставить: ${currentPlayer?.name ?? '…'}`}
         </div>
@@ -87,7 +105,22 @@ function BiddingPhase({ room, myId, hand }: Props) {
         })}
       </div>
 
-      {isMyTurn && (
+      {/* Dark / not-dark choice — normal rounds only, before bid */}
+      {isNormalRound && isMyTurn && darkChoice === null && (
+        <div className="dark-choice-area">
+          <p className="dark-choice-prompt">Оберіть тип замовлення:</p>
+          <div className="dark-choice-buttons">
+            <button className="btn-dark-choice btn-dark-choice--dark" onClick={() => setDarkChoice('dark')}>
+              Темна
+            </button>
+            <button className="btn-dark-choice" onClick={() => setDarkChoice('not-dark')}>
+              Не темна
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showBidInput && (
         <div className="bid-input-area">
           <p className="bid-prompt">
             Скільки взяток візьмете?
@@ -121,22 +154,28 @@ function BiddingPhase({ room, myId, hand }: Props) {
       )}
 
       <div className="hand-area hand-area--preview">
-        <p className="hand-label">Ваші карти ({hand.length})</p>
-        <div className="hand-cards">
-          {sortHand(hand, ar.trumpSuit).map((card, idx) => (
-            <span
-              key={`${card.suit}:${card.rank}:${idx}`}
-              className={[
-                'hand-card',
-                'hand-card--dim',
-                card.isJoker ? 'hand-card--joker' : '',
-                isRed(card) ? 'hand-card--red' : '',
-              ].filter(Boolean).join(' ')}
-            >
-              {card.label}
-            </span>
-          ))}
-        </div>
+        {showHand ? (
+          <>
+            <p className="hand-label">Ваші карти ({hand.length})</p>
+            <div className="hand-cards">
+              {sortHand(hand, ar.trumpSuit).map((card, idx) => (
+                <span
+                  key={`${card.suit}:${card.rank}:${idx}`}
+                  className={[
+                    'hand-card',
+                    'hand-card--dim',
+                    card.isJoker ? 'hand-card--joker' : '',
+                    isRed(card) ? 'hand-card--red' : '',
+                  ].filter(Boolean).join(' ')}
+                >
+                  {card.label}
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="hand-hidden-notice">Карти приховані до замовлення</p>
+        )}
       </div>
     </div>
   );

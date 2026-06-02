@@ -73,8 +73,8 @@ export function dealRound(room: GameRoom, _testDeck?: Card[]): DealResult {
   // Misere and golden have no bidding phase
   const skipsBidding = roundDef.type === 'misere' || roundDef.type === 'golden';
 
-  // Trump is determined before bidding for normal and dark rounds
-  const withTrump = roundDef.type === 'normal' || roundDef.type === 'dark';
+  // All round types have trump except no-trump
+  const withTrump = roundDef.type !== 'no-trump';
   let trumpCard: Card | null = null;
   let trumpSuit: Suit | null = null;
   if (withTrump) {
@@ -97,6 +97,7 @@ export function dealRound(room: GameRoom, _testDeck?: Card[]): DealResult {
     trickLeadPlayerId: firstPlayerId,
     tricksWon: Object.fromEntries(room.players.map(p => [p.id, 0])),
     playerCardCounts: Object.fromEntries(room.players.map(p => [p.id, roundDef.cardsPerPlayer])),
+    playerDarkFlags: {},
     isComplete: false,
     lastTrick: null,
   };
@@ -137,7 +138,10 @@ export function finishRound(room: GameRoom): FinishRoundResult {
   for (const ps of gameSheet.scores) {
     const bid = ar.bids[ps.playerId] ?? null;
     const actualTricks = ar.tricksWon[ps.playerId] ?? 0;
-    const pts = computeScore(roundDef.type, bid, actualTricks);
+    const base = computeScore(roundDef.type, bid, actualTricks);
+    // Per-player dark multiplier: only for normal rounds where the player chose dark
+    const playerWentDark = roundDef.type === 'normal' && (ar.playerDarkFlags[ps.playerId] ?? false);
+    const pts = playerWentDark ? base * 2 : base;
     scored[ps.playerId] = pts;
     ps.scores[ar.roundIndex] = pts;
     ps.total += pts;
@@ -166,6 +170,7 @@ export function placeBid(
   room: GameRoom,
   playerId: string,
   tricks: number,
+  isDark = false,
 ): BidResult {
   const ar = room.activeRound;
   if (!ar) return { ok: false, error: 'Раунд не активний' };
@@ -201,6 +206,7 @@ export function placeBid(
   }
 
   ar.bids[playerId] = tricks;
+  ar.playerDarkFlags[playerId] = isDark;
 
   if (playerScore && ar.roundIndex < playerScore.bids.length) {
     playerScore.bids[ar.roundIndex] = tricks;

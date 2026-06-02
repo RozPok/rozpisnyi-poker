@@ -131,6 +131,7 @@ export interface ActiveRound {
   trickLeadPlayerId: string;           // who leads the first trick
   tricksWon: Record<string, number>;   // playerId → tricks won this round
   playerCardCounts: Record<string, number>; // playerId → cards still in hand (public)
+  playerDarkFlags: Record<string, boolean>; // playerId → chose dark bid this round (normal rounds)
   isComplete: boolean;                 // true when all cards have been played
   lastTrick: LastTrick | null;         // snapshot of the most recently completed trick
 }
@@ -218,7 +219,7 @@ export interface ClientToServerEvents {
   ) => void;
   'room:leave': (callback: () => void) => void;
   'game:start': (callback: (result: RoomResult) => void) => void;
-  'bid:submit': (tricks: number, callback: (result: BidResult) => void) => void;
+  'bid:submit': (tricks: number, isDark: boolean, callback: (result: BidResult) => void) => void;
   'card:play': (
     card: Card,
     declaration: JokerDeclaration | null,

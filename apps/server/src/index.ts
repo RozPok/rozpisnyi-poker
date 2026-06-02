@@ -127,13 +127,13 @@ io.on('connection', socket => {
   });
 
   // ── bid:submit ──────────────────────────────────────────────────────────────
-  socket.on('bid:submit', (tricks, callback) => {
+  socket.on('bid:submit', (tricks, isDark, callback) => {
     const room = rooms.getRoomByPlayerId(socket.id);
     if (!room) {
       callback({ ok: false, error: 'Кімнату не знайдено' });
       return;
     }
-    const result = game.placeBid(room, socket.id, tricks);
+    const result = game.placeBid(room, socket.id, tricks, isDark);
     if (result.ok) {
       io.to(room.id).emit('room:updated', room);
     }
