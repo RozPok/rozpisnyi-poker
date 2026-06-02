@@ -79,6 +79,32 @@ describe('cardBeats', () => {
   it('equal card does not beat itself', () => {
     expect(cardBeats(card('hearts', 'K'), card('hearts', 'K'), 'hearts', null)).toBe(false);
   });
+
+  // ── Joker rules ──────────────────────────────────────────────────────────────
+
+  it('joker beats trump', () => {
+    expect(cardBeats(joker(), card('spades', 'A'), 'hearts', 'spades')).toBe(true);
+  });
+
+  it('trump does not beat joker', () => {
+    expect(cardBeats(card('spades', 'A'), joker(), 'hearts', 'spades')).toBe(false);
+  });
+
+  it('joker beats lead-suit ace', () => {
+    expect(cardBeats(joker(), card('hearts', 'A'), 'hearts', null)).toBe(true);
+  });
+
+  it('lead-suit ace does not beat joker', () => {
+    expect(cardBeats(card('hearts', 'A'), joker(), 'hearts', null)).toBe(false);
+  });
+
+  it('second joker does not beat first joker', () => {
+    expect(cardBeats(joker(), joker(), null, null)).toBe(false);
+  });
+
+  it('second joker does not beat first joker even with trump set', () => {
+    expect(cardBeats(joker(), joker(), 'hearts', 'spades')).toBe(false);
+  });
 });
 
 // ─── determineTrickWinner ─────────────────────────────────────────────────────
@@ -143,5 +169,52 @@ describe('determineTrickWinner', () => {
       play('p2', card('hearts', 'K')), // same rank same suit — p1 stays best
     ];
     expect(determineTrickWinner(trick, 'hearts', null)).toBe('p1');
+  });
+
+  // ── Joker integration ─────────────────────────────────────────────────────────
+
+  it('joker beats highest trump card', () => {
+    const trick = [
+      play('p1', card('spades', 'A')), // highest trump
+      play('p2', joker()),
+    ];
+    expect(determineTrickWinner(trick, 'hearts', 'spades')).toBe('p2');
+  });
+
+  it('joker beats highest lead-suit card', () => {
+    const trick = [
+      play('p1', card('hearts', 'A')),
+      play('p2', card('hearts', 'K')),
+      play('p3', joker()),
+    ];
+    expect(determineTrickWinner(trick, 'hearts', null)).toBe('p3');
+  });
+
+  it('first joker wins when two jokers are played', () => {
+    const trick = [
+      play('p1', card('hearts', 'A')),
+      play('p2', joker()),           // first joker
+      play('p3', joker()),           // second joker — should NOT win
+    ];
+    expect(determineTrickWinner(trick, 'hearts', 'spades')).toBe('p2');
+  });
+
+  it('first joker wins even when it is the opening card', () => {
+    const trick = [
+      play('p1', joker()),           // leads the trick
+      play('p2', card('spades', 'A')),
+      play('p3', joker()),           // second joker
+    ];
+    // leadSuit is null because joker led — any card follows
+    expect(determineTrickWinner(trick, null, 'spades')).toBe('p1');
+  });
+
+  it('single joker in trick always wins', () => {
+    const trick = [
+      play('p1', card('hearts', '7')),
+      play('p2', joker()),
+      play('p3', card('clubs', 'A')),
+    ];
+    expect(determineTrickWinner(trick, 'hearts', null)).toBe('p2');
   });
 });

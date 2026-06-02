@@ -8,7 +8,7 @@ export const RANK_ORDER: Record<string, number> = {
 /**
  * Returns true if `challenger` beats `current` given the lead and trump suits.
  * Rules (in priority order):
- *   1. Joker always wins; if both are jokers the current holder wins (no change).
+ *   1. Joker always wins; if both are jokers the first-played (current) wins.
  *   2. Trump beats non-trump.
  *   3. Lead-suit beats off-suit.
  *   4. Higher rank wins within the same category.
@@ -19,6 +19,7 @@ export function cardBeats(
   leadSuit: Suit | null,
   trumpSuit: Suit | null,
 ): boolean {
+  if (challenger.isJoker && current.isJoker) return false; // first joker played wins
   if (challenger.isJoker) return true;
   if (current.isJoker) return false;
 

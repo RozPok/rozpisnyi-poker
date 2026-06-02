@@ -559,3 +559,70 @@ describe('finishRound — round progression', () => {
     expect(() => finishRound(room)).toThrow();
   });
 });
+
+// ─── Joker integration ────────────────────────────────────────────────────────
+
+const JOKER_CARD = { suit: 'spades' as const, rank: '6' as const, isJoker: true, label: 'Жопа' };
+
+describe('playCard — Joker wins trick', () => {
+  it('player who plays Joker wins the trick', () => {
+    const room = makeRoomWithScores(3, 3, 'normal');
+    const ar = room.activeRound!;
+    ar.phase = 'playing';
+    ar.bids = { p1: 1, p2: 1, p3: 0 };
+
+    // Inject Joker as p1's first card
+    const h1 = getHand(room.id, 'p1')!;
+    h1[0] = JOKER_CARD;
+
+    playCard(room, 'p1', JOKER_CARD); // Joker leads
+    playLegalCard(room, 'p2');
+    playLegalCard(room, 'p3');
+
+    expect(ar.tricksWon['p1']).toBe(1);
+    expect(ar.tricksWon['p2']).toBe(0);
+    expect(ar.tricksWon['p3']).toBe(0);
+  });
+
+  it('Joker beats highest trump card', () => {
+    const room = makeRoomWithScores(3, 3, 'normal');
+    const ar = room.activeRound!;
+    ar.phase = 'playing';
+    ar.bids = { p1: 1, p2: 1, p3: 0 };
+    ar.trumpSuit = 'spades';
+
+    // p2 plays Joker; p1 leads with a trump ace to set up a strong current winner
+    const h1 = getHand(room.id, 'p1')!;
+    const h2 = getHand(room.id, 'p2')!;
+
+    h1[0] = { suit: 'spades', rank: 'A', isJoker: false, label: 'A♠' }; // highest trump
+    h2[0] = JOKER_CARD;
+
+    playCard(room, 'p1', h1[0]!);  // trump ace leads
+    playCard(room, 'p2', JOKER_CARD); // Joker overrides
+    playLegalCard(room, 'p3');
+
+    expect(ar.tricksWon['p2']).toBe(1);
+    expect(ar.tricksWon['p1']).toBe(0);
+  });
+
+  it('first Joker beats second Joker', () => {
+    const room = makeRoomWithScores(3, 3, 'normal');
+    const ar = room.activeRound!;
+    ar.phase = 'playing';
+    ar.bids = { p1: 1, p2: 1, p3: 0 };
+
+    // Give both p1 and p2 Jokers
+    const h1 = getHand(room.id, 'p1')!;
+    const h2 = getHand(room.id, 'p2')!;
+    h1[0] = JOKER_CARD;
+    h2[0] = { ...JOKER_CARD }; // second Joker (copy so !== same ref)
+
+    playCard(room, 'p1', h1[0]!); // first Joker
+    playCard(room, 'p2', h2[0]!); // second Joker — must NOT win
+    playLegalCard(room, 'p3');
+
+    expect(ar.tricksWon['p1']).toBe(1); // first Joker wins
+    expect(ar.tricksWon['p2']).toBe(0);
+  });
+});
