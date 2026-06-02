@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { BidResult, Card, GameRoom, JokerDeclaration, LastTrick, PlayResult, Suit } from '@rozpisnyi-poker/shared';
 import { canRevealHand, getLegalBids, getLegalCards, sortHand, TRUMP_SUIT_LABELS } from '@rozpisnyi-poker/shared';
 import { socket } from '../socket.ts';
@@ -183,6 +183,8 @@ function BiddingPhase({ room, myId, hand }: Props) {
 
 // ─── Playing phase ────────────────────────────────────────────────────────────
 
+const TRICK_DISPLAY_MS = 2500;
+
 type JokerModalState =
   | { step: 'mode'; card: Card }                                          // leading — choose mode
   | { step: 'suit'; card: Card; mode: 'highest-suit' | 'lowest-suit' }   // leading — choose suit
@@ -195,6 +197,38 @@ function PlayingPhase({ room, myId, hand, onCardPlayed }: Props) {
   const [jokerModal, setJokerModal] = useState<JokerModalState | null>(null);
   const [showLastTrick, setShowLastTrick] = useState(false);
   const sortedHand = sortHand(hand, ar.trumpSuit);
+
+  // ── Completed-trick snapshot (shown for TRICK_DISPLAY_MS after each trick) ──
+  const [completedTrickSnapshot, setCompletedTrickSnapshot] = useState<LastTrick | null>(null);
+  // Ref so the effect always reads the latest lastTrick without it being in deps.
+  const lastTrickRef = useRef<LastTrick | null>(null);
+  lastTrickRef.current = ar.lastTrick;
+  const lastTrickIndex = ar.lastTrick?.trickIndex ?? -1;
+
+  useEffect(() => {
+    if (lastTrickIndex < 0) {
+      // New round started — clear any lingering snapshot immediately.
+      setCompletedTrickSnapshot(null);
+      return;
+    }
+    setCompletedTrickSnapshot(lastTrickRef.current);
+    const t = setTimeout(() => setCompletedTrickSnapshot(null), TRICK_DISPLAY_MS);
+    return () => clearTimeout(t);
+  }, [lastTrickIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // What to show on the table:
+  //   • current trick in progress → ar.currentTrick
+  //   • trick just completed, within TRICK_DISPLAY_MS → snapshot
+  //   • otherwise → empty ("Стіл порожній")
+  const showSnapshot = completedTrickSnapshot !== null && ar.currentTrick.length === 0;
+  const trickDisplayPlays = ar.currentTrick.length > 0
+    ? ar.currentTrick
+    : showSnapshot
+      ? completedTrickSnapshot!.plays
+      : null;
+  const snapshotWinnerName = showSnapshot && completedTrickSnapshot
+    ? (room.players.find(p => p.id === completedTrickSnapshot.winnerId)?.name ?? null)
+    : null;
 
   const legalCards = isMyTurn
     ? getLegalCards(hand, ar.leadSuit, ar.trumpSuit, ar.jokerDeclaration ?? undefined)
@@ -259,16 +293,19 @@ function PlayingPhase({ room, myId, hand, onCardPlayed }: Props) {
       )}
 
       <div className="trick-area">
-        {ar.currentTrick.length === 0 ? (
+        {trickDisplayPlays === null ? (
           <p className="trick-empty">Стіл порожній</p>
         ) : (
-          ar.currentTrick.map(play => (
+          trickDisplayPlays.map(play => (
             <div
               key={play.playerId}
               className={[
                 'table-card',
                 play.card.isJoker ? 'table-card--joker' : '',
                 isRed(play.card) ? 'table-card--red' : '',
+                showSnapshot && play.playerId === completedTrickSnapshot?.winnerId
+                  ? 'table-card--winner'
+                  : '',
               ].filter(Boolean).join(' ')}
             >
               <span className="table-card-label">{play.card.label}</span>
@@ -278,8 +315,10 @@ function PlayingPhase({ room, myId, hand, onCardPlayed }: Props) {
         )}
       </div>
 
-      {ar.isComplete && (
-        <div className="round-complete-banner">Раунд завершено!</div>
+      {snapshotWinnerName && (
+        <div className="trick-winner-banner">
+          Взятку забирає: <strong>{snapshotWinnerName}</strong>
+        </div>
       )}
 
       <div className="prev-trick-row">

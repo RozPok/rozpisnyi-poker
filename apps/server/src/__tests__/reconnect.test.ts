@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as rooms from '../rooms';
 
+const GRACE_MS = 600_000; // 10 minutes — must match DISCONNECT_GRACE_MS in index.ts
+
 beforeEach(() => {
   rooms._reset();
 });
@@ -62,6 +64,22 @@ describe('reconnectPlayer', () => {
     expect(restored.status).toBe('in-progress');
     expect(restored.gameSheet).not.toBeNull();
   });
+
+  it('reconnect after 9 minutes succeeds (within 10-min grace)', () => {
+    vi.useFakeTimers();
+    const room = rooms.createRoom('p1', 'Alice');
+    rooms.markDisconnected('p1');
+
+    const timer = setTimeout(() => rooms.leaveRoom('p1'), GRACE_MS);
+    rooms.setDisconnectTimer('p1', timer);
+
+    // Advance 9 minutes — player is still in the room
+    vi.advanceTimersByTime(9 * 60 * 1000);
+
+    const result = rooms.reconnectPlayer(room.code, 'p1', 'Alice');
+    expect(typeof result).not.toBe('string');
+    expect((result as ReturnType<typeof rooms.createRoom>).players).toHaveLength(1);
+  });
 });
 
 // ─── markDisconnected ─────────────────────────────────────────────────────────
@@ -82,45 +100,45 @@ describe('markDisconnected', () => {
   });
 });
 
-// ─── Grace period timer ───────────────────────────────────────────────────────
+// ─── Grace period timer (10 minutes) ─────────────────────────────────────────
 
-describe('disconnect grace period', () => {
-  it('does not remove player before the timer fires', () => {
+describe('disconnect grace period — 10 minutes', () => {
+  it('does not remove player before 10 minutes', () => {
     vi.useFakeTimers();
-    const room = rooms.createRoom('p1', 'Alice');
+    rooms.createRoom('p1', 'Alice');
     rooms.markDisconnected('p1');
 
-    const timer = setTimeout(() => rooms.leaveRoom('p1'), 60_000);
+    const timer = setTimeout(() => rooms.leaveRoom('p1'), GRACE_MS);
     rooms.setDisconnectTimer('p1', timer);
 
-    vi.advanceTimersByTime(59_999);
+    vi.advanceTimersByTime(GRACE_MS - 1);
     expect(rooms.getRoomByPlayerId('p1')).toBeDefined();
   });
 
-  it('removes player after the timer fires', () => {
+  it('removes player after 10-minute grace period expires', () => {
     vi.useFakeTimers();
-    const room = rooms.createRoom('p1', 'Alice');
+    rooms.createRoom('p1', 'Alice');
     rooms.markDisconnected('p1');
 
-    const timer = setTimeout(() => rooms.leaveRoom('p1'), 60_000);
+    const timer = setTimeout(() => rooms.leaveRoom('p1'), GRACE_MS);
     rooms.setDisconnectTimer('p1', timer);
 
-    vi.advanceTimersByTime(60_001);
+    vi.advanceTimersByTime(GRACE_MS + 1);
     expect(rooms.getRoomByPlayerId('p1')).toBeUndefined();
   });
 
-  it('reconnect before timeout cancels the removal timer', () => {
+  it('reconnect before 10-minute timeout cancels the removal timer', () => {
     vi.useFakeTimers();
     const room = rooms.createRoom('p1', 'Alice');
     rooms.markDisconnected('p1');
 
-    const timer = setTimeout(() => rooms.leaveRoom('p1'), 60_000);
+    const timer = setTimeout(() => rooms.leaveRoom('p1'), GRACE_MS);
     rooms.setDisconnectTimer('p1', timer);
 
     // Reconnect before timer fires — should cancel removal
     rooms.reconnectPlayer(room.code, 'p1', 'Alice');
 
-    vi.advanceTimersByTime(60_001);
+    vi.advanceTimersByTime(GRACE_MS + 1);
     expect(rooms.getRoomByPlayerId('p1')).toBeDefined();
   });
 
@@ -129,7 +147,7 @@ describe('disconnect grace period', () => {
     rooms.createRoom('p1', 'Alice');
     rooms.markDisconnected('p1');
 
-    const timer = setTimeout(() => rooms.leaveRoom('p1'), 60_000);
+    const timer = setTimeout(() => rooms.leaveRoom('p1'), GRACE_MS);
     rooms.setDisconnectTimer('p1', timer);
 
     expect(rooms.cancelDisconnectTimer('p1')).toBe(true);
@@ -137,6 +155,23 @@ describe('disconnect grace period', () => {
 
   it('cancelDisconnectTimer returns false when no timer exists', () => {
     expect(rooms.cancelDisconnectTimer('nobody')).toBe(false);
+  });
+
+  it('failed network attempt (no socket connection) does not touch session — server-side player stays', () => {
+    // When a socket never connects, the server never receives room:reconnect.
+    // The player remains in the room with isConnected=false until the grace expires.
+    vi.useFakeTimers();
+    const room = rooms.createRoom('p1', 'Alice');
+    rooms.markDisconnected('p1');
+
+    const timer = setTimeout(() => rooms.leaveRoom('p1'), GRACE_MS);
+    rooms.setDisconnectTimer('p1', timer);
+
+    // 5 minutes pass without any reconnect attempt
+    vi.advanceTimersByTime(5 * 60 * 1000);
+
+    // Player is still there — session is still valid on the server side
+    expect(rooms.getRoomByPlayerId('p1')).toBeDefined();
   });
 });
 
@@ -155,17 +190,16 @@ describe('leaveRoom (intentional)', () => {
     rooms.markDisconnected('p1');
 
     const timer = setTimeout(() => {
-      // This should never run because leaveRoom cancels it
       rooms.leaveRoom('p1');
-    }, 60_000);
+    }, GRACE_MS);
     rooms.setDisconnectTimer('p1', timer);
 
-    // Explicit leave — should cancel the timer and remove immediately
+    // Explicit leave — cancels the timer and removes immediately
     rooms.leaveRoom('p1');
     expect(rooms.getRoomByPlayerId('p1')).toBeUndefined();
 
     // Advance time — no double-removal errors
-    vi.advanceTimersByTime(60_001);
+    vi.advanceTimersByTime(GRACE_MS + 1);
     expect(rooms.getRoomByPlayerId('p1')).toBeUndefined();
   });
 

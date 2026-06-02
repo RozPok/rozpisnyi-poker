@@ -13,35 +13,55 @@ export default function App() {
   const myId = myPlayerId;
   const [myHand, setMyHand] = useState<Card[]>([]);
   const [restoreError, setRestoreError] = useState('');
+  // True while the socket is down but the player was in a room.
+  const [isSocketDown, setIsSocketDown] = useState(false);
+  // Switched to true after ~12 s on the restoring screen (Render cold-start).
+  const [slowConnection, setSlowConnection] = useState(false);
 
-  // Track whether we're currently in a room (used to decide whether to reconnect
-  // after a transient socket disconnect/reconnect cycle).
+  // Ref so event-handler closures can read the current room state without
+  // being re-registered on every render.
   const inRoomRef = useRef(false);
   inRoomRef.current = room !== null;
+
+  // Show "Сервер прокидається…" after 12 s on the restoring screen.
+  useEffect(() => {
+    if (page !== 'restoring') {
+      setSlowConnection(false);
+      return;
+    }
+    const t = setTimeout(() => setSlowConnection(true), 12_000);
+    return () => clearTimeout(t);
+  }, [page]);
 
   useEffect(() => {
     socket.connect();
 
     socket.on('connect', () => {
+      setIsSocketDown(false);
       const session = loadSession();
 
       if (!session) {
-        // No saved session — go straight to home screen.
-        setPage('home');
+        if (!inRoomRef.current) setPage('home');
         return;
       }
 
-      // Try to restore the session every time the socket (re)connects.
-      // This handles both page refresh and transient mobile disconnects.
-      setPage('restoring');
+      // Capture whether we already had room state at the moment of (re)connect.
+      // If yes (mobile suspend/resume): stay on lobby with an overlay rather than
+      // flashing the restoring screen.
+      const hadRoom = inRoomRef.current;
+      if (!hadRoom) setPage('restoring');
+
       socket.emit('room:reconnect', { roomCode: session.roomCode, playerName: session.playerName }, result => {
         if (result.ok) {
           setRoom(result.room);
           setMyHand(result.hand);
-          setPage('lobby');
+          if (!hadRoom) setPage('lobby');
+          // hadRoom case: page stays 'lobby', overlay clears via isSocketDown=false above
         } else {
+          // Room or player no longer exists on the server — session is stale.
           clearSession();
           setRestoreError('Не вдалося відновити сесію');
+          setRoom(null);
           setPage('home');
         }
       });
@@ -51,10 +71,11 @@ export default function App() {
     socket.on('hand:dealt', hand => setMyHand(hand));
 
     socket.on('disconnect', () => {
-      // Keep room/hand state alive — socket.io will attempt to reconnect
-      // automatically and the 'connect' handler above will restore the session.
-      // Only reset to home if we were not in a room at all.
-      if (!inRoomRef.current) {
+      if (inRoomRef.current) {
+        // Keep game state alive — show a reconnecting overlay while socket.io
+        // retries. Session stays in localStorage; do NOT clear it.
+        setIsSocketDown(true);
+      } else {
         setPage('home');
       }
     });
@@ -90,13 +111,22 @@ export default function App() {
     return (
       <main className="screen">
         <h1 className="title">Розписний Покер</h1>
-        <p className="subtitle">Відновлення сесії…</p>
+        <p className="subtitle">
+          {slowConnection ? 'Сервер прокидається, зачекайте…' : 'Відновлення сесії…'}
+        </p>
       </main>
     );
   }
 
   if (page === 'lobby' && room) {
-    return <Lobby room={room} myId={myId} hand={myHand} onLeave={handleLeave} onCardPlayed={handleCardPlayed} />;
+    return (
+      <>
+        {isSocketDown && (
+          <div className="reconnecting-overlay">Перепідключення…</div>
+        )}
+        <Lobby room={room} myId={myId} hand={myHand} onLeave={handleLeave} onCardPlayed={handleCardPlayed} />
+      </>
+    );
   }
 
   return <Home onRoomJoined={handleRoomJoined} restoreError={restoreError} />;

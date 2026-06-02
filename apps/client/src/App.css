@@ -315,6 +315,34 @@ body {
   gap: 0.75rem;
 }
 
+.lobby-waiting-msg {
+  font-size: 0.82rem;
+  text-align: center;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.06);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.75rem;
+}
+
+/* ─── Reconnecting overlay ─────────────────────────────────────────────────── */
+
+.reconnecting-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(239, 68, 68, 0.88);
+  color: #fff;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.4rem 1rem;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
 /* ─── Game started banner ──────────────────────────────────────────────────── */
 
 .game-started-banner {
@@ -1006,6 +1034,27 @@ body {
   border: 1px solid rgba(134, 239, 172, 0.3);
 }
 
+/* ─── Trick winner banner (shown for 2.5 s after a trick completes) ────────── */
+
+.trick-winner-banner {
+  font-size: 0.82rem;
+  text-align: center;
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(134, 239, 172, 0.1);
+  border: 1px solid rgba(134, 239, 172, 0.3);
+  animation: fadeIn 0.2s ease;
+}
+
+.trick-winner-banner strong {
+  color: #86efac;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ─── Player hand ──────────────────────────────────────────────────────────── */
 
 .hand-area {
@@ -1648,16 +1697,25 @@ body {
   .table-card-label  { font-size: 0.95rem; }
   .table-card-player { font-size: 0.56rem; }
 
-  /* ── Player hand — horizontal scroll; never wraps ───────────────────────── */
+  /* ── Player hand — horizontal scroll rail; never wraps ──────────────────── */
 
-  .hand-area  { padding: 0.5rem 0.4rem; gap: 0.3rem; }
+  .hand-area {
+    padding: 0.5rem 0.4rem;
+    gap: 0.3rem;
+    /* Clip cards that slide outside the box; scroll happens inside hand-cards */
+    overflow: hidden;
+  }
   .hand-label { font-size: 0.68rem; }
 
   .hand-cards {
+    /* width:100% is essential — without it the flex child sizes to content and
+       overflow-x:auto has nothing to scroll within on mobile WebKit */
+    width: 100%;
     flex-wrap: nowrap;
     overflow-x: auto;
     justify-content: flex-start;
-    padding-bottom: 5px;
+    gap: 0;                    /* gap replaced by per-card margin for overlap */
+    padding: 2px 4px 8px;      /* bottom room for scrollbar thumb */
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     scrollbar-color: rgba(201, 168, 76, 0.3) transparent;
@@ -1665,9 +1723,18 @@ body {
 
   .hand-card {
     flex-shrink: 0;
-    padding: 0.55rem 0.65rem;
-    min-width: 46px;
-    font-size: 0.95rem;
+    padding: 0.6rem 0.5rem;
+    min-width: 44px;            /* 44 px is the iOS/Android minimum tap target */
+    font-size: 0.9rem;
+    /* Slight negative margin overlaps adjacent cards, fitting more on screen */
+    margin-right: -6px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Last card in the rail should not overlap anything to its right */
+  .hand-card:last-child {
+    margin-right: 4px;
   }
 
   /* no hover-lift on touchscreens */

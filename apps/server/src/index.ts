@@ -13,7 +13,8 @@ const PORT          = process.env.PORT ?? 3001;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
 
 // Grace period before a disconnected player is removed from their room.
-const DISCONNECT_GRACE_MS = 60_000;
+// 10 minutes covers mobile browser suspension and Render free-tier cold starts.
+const DISCONNECT_GRACE_MS = 600_000;
 
 // ─── Express ──────────────────────────────────────────────────────────────────
 
