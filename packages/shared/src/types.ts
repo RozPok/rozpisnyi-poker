@@ -200,6 +200,10 @@ export type RoomResult =
   | { ok: true; room: GameRoom }
   | { ok: false; error: string };
 
+export type ReconnectResult =
+  | { ok: true; room: GameRoom; hand: Card[] }
+  | { ok: false; error: string };
+
 // ─── Socket.io event contracts ────────────────────────────────────────────────
 
 export interface ServerToClientEvents {
@@ -218,6 +222,10 @@ export interface ClientToServerEvents {
     callback: (result: RoomResult) => void,
   ) => void;
   'room:leave': (callback: () => void) => void;
+  'room:reconnect': (
+    payload: { roomCode: string; playerName: string },
+    callback: (result: ReconnectResult) => void,
+  ) => void;
   'game:start': (callback: (result: RoomResult) => void) => void;
   'bid:submit': (tricks: number, isDark: boolean, callback: (result: BidResult) => void) => void;
   'card:play': (

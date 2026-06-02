@@ -7,10 +7,11 @@ import ServerStatusBadge from '../components/ServerStatusBadge.tsx';
 type HomeView = 'menu' | 'create' | 'join';
 
 interface Props {
-  onRoomJoined: (room: GameRoom) => void;
+  onRoomJoined: (room: GameRoom, playerName: string) => void;
+  restoreError?: string;
 }
 
-export default function Home({ onRoomJoined }: Props) {
+export default function Home({ onRoomJoined, restoreError }: Props) {
   const [view, setView] = useState<HomeView>('menu');
   const [playerName, setPlayerName] = useState('');
   const [roomCode, setRoomCode] = useState('');
@@ -29,10 +30,11 @@ export default function Home({ onRoomJoined }: Props) {
     if (!playerName.trim() || isLoading) return;
     setIsLoading(true);
     setError('');
-    socket.emit('room:create', playerName.trim(), result => {
+    const name = playerName.trim();
+    socket.emit('room:create', name, result => {
       setIsLoading(false);
       if (!result.ok) { setError(result.error); return; }
-      onRoomJoined(result.room);
+      onRoomJoined(result.room, name);
     });
   }
 
@@ -40,10 +42,11 @@ export default function Home({ onRoomJoined }: Props) {
     if (!playerName.trim() || !roomCode.trim() || isLoading) return;
     setIsLoading(true);
     setError('');
-    socket.emit('room:join', { code: roomCode.trim(), playerName: playerName.trim() }, result => {
+    const name = playerName.trim();
+    socket.emit('room:join', { code: roomCode.trim(), playerName: name }, result => {
       setIsLoading(false);
       if (!result.ok) { setError(result.error); return; }
-      onRoomJoined(result.room);
+      onRoomJoined(result.room, name);
     });
   }
 
@@ -131,6 +134,7 @@ export default function Home({ onRoomJoined }: Props) {
     <main className="screen">
       <h1 className="title">Розписний Покер</h1>
       <p className="subtitle">Онлайн карткова гра</p>
+      {restoreError && <p className="error">{restoreError}</p>}
       <div className="btn-col">
         <button className="btn btn-primary" onClick={() => setView('create')}>
           Створити гру
