@@ -1506,3 +1506,243 @@ body {
 }
 
 .joker-close-btn:hover { opacity: 0.9; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOUCH — remove 300 ms tap delay on all interactive elements
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.btn,
+.btn-copy,
+.btn-sheet,
+.btn-prev-trick,
+.btn-dark-choice,
+.hand-card,
+.bid-option,
+.joker-mode-btn,
+.joker-suit-btn,
+.joker-back-btn,
+.joker-close-btn {
+  touch-action: manipulation;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Mobile compact game layout
+   Targets: ≤ 480px — iPhone SE (375), iPhone 14 (390), Plus/Max (430–480)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 480px) {
+
+  /* ── Body: top-anchored so tall content never clips above the fold ─────── */
+
+  body {
+    align-items: flex-start;
+    justify-content: center;
+    /* safe-area-inset-bottom handles iPhone notch / home-bar gap */
+    padding: 0.5rem 0.5rem max(1rem, env(safe-area-inset-bottom)) 0.5rem;
+    min-height: 100dvh;
+    overflow-x: hidden; /* no horizontal bleed */
+  }
+
+  /* ── Screen card ─────────────────────────────────────────────────────────── */
+
+  .screen {
+    padding: 1rem 0.85rem;
+    gap: 0.75rem;
+    min-width: 0;
+    border-radius: 8px;
+  }
+
+  .lobby { gap: 0.75rem; }
+
+  /* ── Typography ──────────────────────────────────────────────────────────── */
+
+  .title     { font-size: 1.35rem; letter-spacing: 0.01em; }
+  .subtitle  { font-size: 0.88rem; }
+  .room-code { font-size: 1.45rem; letter-spacing: 0.12em; }
+
+  /* ── Lobby / home buttons ────────────────────────────────────────────────── */
+
+  .btn       { padding: 0.75rem 1rem; font-size: 0.95rem; }
+  .btn-copy  { padding: 0.35rem 0.65rem; font-size: 0.76rem; }
+
+  /* ── Player list ─────────────────────────────────────────────────────────── */
+
+  .player-list { max-height: 160px; }
+  .player-item { padding: 0.45rem 0.65rem; font-size: 0.88rem; }
+
+  /* ── Game screen shell ───────────────────────────────────────────────────── */
+
+  .game-screen { padding: 0.35rem; gap: 0.35rem; }
+  .game-header { gap: 0.25rem; }
+
+  /* game-round-pill duplicates RoundInfoPanel — hide it on mobile to save
+     vertical space; all round/trump info is already in the panel below */
+  .game-round-pill { display: none; }
+
+  /* ── Game header action buttons — small but ≥ 44px touch target ──────────── */
+
+  .game-header-actions {
+    gap: 0.3rem;
+    width: 100%;
+  }
+
+  .btn-sheet,
+  .game-header-actions .btn-secondary {
+    flex: 1;
+    min-height: 44px;
+    padding: 0 0.7rem;
+    font-size: 0.78rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── Game table ──────────────────────────────────────────────────────────── */
+
+  .game-table { gap: 0.4rem; }
+
+  /* ── Compact scoreboard ──────────────────────────────────────────────────── */
+
+  .scoreboard-compact-row {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.74rem;
+    gap: 0.35rem;
+  }
+
+  .sbc-delta  { font-size: 0.65rem; min-width: 1.8rem; }
+  .sbc-total  { font-size: 0.8rem;  min-width: 2rem; }
+
+  /* ── Round info panel — compact 2×2 grid ────────────────────────────────── */
+
+  .round-info-panel {
+    flex-wrap: wrap;
+    padding: 0.4rem 0.3rem;
+    gap: 0.3rem;
+  }
+
+  .rip-divider { display: none; }
+
+  .rip-item {
+    flex: 0 0 calc(50% - 0.35rem);
+    padding: 0.2rem 0.35rem;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .rip-label { font-size: 0.52rem; letter-spacing: 0.05em; }
+  .rip-value { font-size: 0.78rem; }
+
+  /* ── Turn banner ─────────────────────────────────────────────────────────── */
+
+  .turn-banner { font-size: 0.82rem; padding: 0.38rem 0.9rem; }
+
+  /* ── Tricks tally ────────────────────────────────────────────────────────── */
+
+  .tricks-tally      { gap: 0.25rem; }
+  .tricks-tally-item { font-size: 0.7rem; padding: 0.17rem 0.45rem; }
+
+  /* ── Trick area ──────────────────────────────────────────────────────────── */
+
+  .trick-area    { min-height: 85px; padding: 0.5rem; gap: 0.4rem; }
+  .table-card    { padding: 0.35rem 0.5rem; min-width: 42px; }
+  .table-card-label  { font-size: 0.95rem; }
+  .table-card-player { font-size: 0.56rem; }
+
+  /* ── Player hand — horizontal scroll; never wraps ───────────────────────── */
+
+  .hand-area  { padding: 0.5rem 0.4rem; gap: 0.3rem; }
+  .hand-label { font-size: 0.68rem; }
+
+  .hand-cards {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding-bottom: 5px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(201, 168, 76, 0.3) transparent;
+  }
+
+  .hand-card {
+    flex-shrink: 0;
+    padding: 0.55rem 0.65rem;
+    min-width: 46px;
+    font-size: 0.95rem;
+  }
+
+  /* no hover-lift on touchscreens */
+  .hand-card:hover:not(:disabled) {
+    transform: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  }
+
+  /* ── Bidding phase — compact ─────────────────────────────────────────────── */
+
+  .bidding-header { gap: 0.3rem; }
+
+  .bids-list { gap: 0.22rem; }
+  .bid-row   { padding: 0.42rem 0.65rem; font-size: 0.82rem; }
+
+  .bid-input-area { padding: 0.65rem 0.6rem; gap: 0.4rem; }
+  .bid-prompt     { font-size: 0.8rem; }
+
+  .bid-options { gap: 0.38rem; }
+  .bid-option  { width: 2.8rem; height: 2.8rem; font-size: 1.05rem; }
+  .bid-submit  { max-width: none; padding: 0.75rem 1rem; }
+
+  /* ── Dark choice ─────────────────────────────────────────────────────────── */
+
+  .dark-choice-area    { padding: 0.6rem; gap: 0.4rem; }
+  .dark-choice-prompt  { font-size: 0.82rem; }
+  .dark-choice-buttons { gap: 0.4rem; width: 100%; }
+
+  .btn-dark-choice {
+    flex: 1;
+    padding: 0.65rem 0.5rem;
+    font-size: 0.88rem;
+    text-align: center;
+    min-height: 44px;
+  }
+
+  /* ── Previous trick button ───────────────────────────────────────────────── */
+
+  .btn-prev-trick { padding: 0.4rem 0.9rem; font-size: 0.76rem; }
+
+  /* ── Previous trick modal ────────────────────────────────────────────────── */
+
+  .last-trick-modal { padding: 0.9rem; width: 95%; min-width: 0; gap: 0.65rem; }
+  .last-trick-title  { font-size: 0.88rem; }
+  .last-trick-cards  { gap: 0.45rem; }
+  .last-trick-winner { font-size: 0.8rem; }
+
+  /* ── Score sheet modal ───────────────────────────────────────────────────── */
+
+  .score-sheet-overlay { padding: 0.35rem; }
+  .score-sheet-modal   { max-height: 96vh; border-radius: 8px; }
+  .score-sheet-header  { padding: 0.65rem 0.9rem; }
+  .score-sheet-title   { font-size: 0.9rem; }
+  .score-sheet-table-wrap { padding: 0.25rem; }
+  .score-sheet-table       { font-size: 0.72rem; }
+  .score-sheet-table th,
+  .score-sheet-table td    { padding: 0.25rem 0.35rem; }
+
+  /* ── Joker declaration banner ────────────────────────────────────────────── */
+
+  .joker-declaration-banner { font-size: 0.76rem; padding: 0.28rem 0.7rem; }
+
+  /* ── Joker modal ─────────────────────────────────────────────────────────── */
+
+  .joker-modal { padding: 1.1rem 0.9rem 0.9rem; width: 95%; min-width: 0; gap: 0.75rem; }
+  .joker-modal-title { font-size: 0.92rem; }
+  .joker-modal-sub   { font-size: 0.8rem; }
+  .joker-mode-btn    { padding: 0.7rem 0.75rem; }
+  .jmb-name          { font-size: 0.88rem; }
+  .jmb-desc          { font-size: 0.68rem; }
+  .joker-suit-btn    { padding: 0.75rem 0.5rem; font-size: 0.92rem; }
+  .joker-back-btn    { font-size: 0.78rem; }
+
+  /* ── Dark round / hand-hidden notices ───────────────────────────────────── */
+
+  .dark-round-banner  { font-size: 0.78rem; padding: 0.28rem 0.7rem; }
+  .hand-hidden-notice { font-size: 0.8rem; padding: 0.5rem 0; }
+}
