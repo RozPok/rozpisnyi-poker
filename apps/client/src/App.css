@@ -1201,6 +1201,98 @@ body {
   padding-top: 0.5rem;
 }
 
+/* ─── Previous trick button ────────────────────────────────────────────────── */
+
+.prev-trick-row {
+  display: flex;
+  justify-content: center;
+}
+
+.btn-prev-trick {
+  padding: 0.3rem 0.9rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s;
+  opacity: 0.75;
+}
+
+.btn-prev-trick:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  opacity: 1;
+}
+
+.btn-prev-trick:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+/* ─── Previous trick modal ──────────────────────────────────────────────────── */
+
+.last-trick-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(2px);
+}
+
+.last-trick-modal {
+  position: relative;
+  background: #1a3d26;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem 1.25rem;
+  min-width: 260px;
+  max-width: 400px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.last-trick-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.last-trick-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.last-trick-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+}
+
+.table-card--winner {
+  outline: 2px solid #86efac;
+  outline-offset: 2px;
+}
+
+.last-trick-winner {
+  font-size: 0.85rem;
+  text-align: center;
+  opacity: 0.85;
+}
+
+.last-trick-winner strong {
+  color: #86efac;
+}
+
 /* ─── Joker declaration banner ─────────────────────────────────────────────── */
 
 .joker-declaration-banner {

@@ -105,6 +105,13 @@ export interface TrickPlay {
   card: Card;
 }
 
+/** Snapshot of the most recently completed trick — for the "previous trick" viewer. */
+export interface LastTrick {
+  plays: TrickPlay[];
+  winnerId: string;
+  trickIndex: number;   // 0-based index of this completed trick
+}
+
 /**
  * Live state of the current round — public (broadcast to all players).
  * Private hands are kept server-side only.
@@ -125,6 +132,7 @@ export interface ActiveRound {
   tricksWon: Record<string, number>;   // playerId → tricks won this round
   playerCardCounts: Record<string, number>; // playerId → cards still in hand (public)
   isComplete: boolean;                 // true when all cards have been played
+  lastTrick: LastTrick | null;         // snapshot of the most recently completed trick
 }
 
 export type PlayResult =

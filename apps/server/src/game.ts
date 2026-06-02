@@ -98,6 +98,7 @@ export function dealRound(room: GameRoom, _testDeck?: Card[]): DealResult {
     tricksWon: Object.fromEntries(room.players.map(p => [p.id, 0])),
     playerCardCounts: Object.fromEntries(room.players.map(p => [p.id, roundDef.cardsPerPlayer])),
     isComplete: false,
+    lastTrick: null,
   };
 
   return { handsMap, activeRound };
@@ -307,6 +308,7 @@ export function playCard(
       ar.jokerDeclaration ?? undefined,
     );
     ar.tricksWon[winnerId] = (ar.tricksWon[winnerId] ?? 0) + 1;
+    ar.lastTrick = { plays: [...ar.currentTrick], winnerId, trickIndex: ar.currentTrickIndex };
     ar.currentTrickIndex++;
     ar.currentTrick = [];
     ar.leadSuit = null;

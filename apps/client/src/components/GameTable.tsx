@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { BidResult, Card, GameRoom, JokerDeclaration, PlayResult, Suit } from '@rozpisnyi-poker/shared';
-import { getLegalBids, getLegalCards, TRUMP_SUIT_LABELS } from '@rozpisnyi-poker/shared';
+import type { BidResult, Card, GameRoom, JokerDeclaration, LastTrick, PlayResult, Suit } from '@rozpisnyi-poker/shared';
+import { getLegalBids, getLegalCards, sortHand, TRUMP_SUIT_LABELS } from '@rozpisnyi-poker/shared';
 import { socket } from '../socket.ts';
 
 interface Props {
@@ -123,7 +123,7 @@ function BiddingPhase({ room, myId, hand }: Props) {
       <div className="hand-area hand-area--preview">
         <p className="hand-label">Ваші карти ({hand.length})</p>
         <div className="hand-cards">
-          {hand.map((card, idx) => (
+          {sortHand(hand, ar.trumpSuit).map((card, idx) => (
             <span
               key={`${card.suit}:${card.rank}:${idx}`}
               className={[
@@ -154,6 +154,8 @@ function PlayingPhase({ room, myId, hand, onCardPlayed }: Props) {
   const isMyTurn = ar.currentTurnPlayerId === myId;
   const currentPlayer = room.players.find(p => p.id === ar.currentTurnPlayerId);
   const [jokerModal, setJokerModal] = useState<JokerModalState | null>(null);
+  const [showLastTrick, setShowLastTrick] = useState(false);
+  const sortedHand = sortHand(hand, ar.trumpSuit);
 
   const legalCards = isMyTurn
     ? getLegalCards(hand, ar.leadSuit, ar.trumpSuit, ar.jokerDeclaration ?? undefined)
@@ -241,10 +243,21 @@ function PlayingPhase({ room, myId, hand, onCardPlayed }: Props) {
         <div className="round-complete-banner">Раунд завершено!</div>
       )}
 
+      <div className="prev-trick-row">
+        <button
+          className="btn-prev-trick"
+          onClick={() => setShowLastTrick(true)}
+          disabled={!ar.lastTrick}
+          title={ar.lastTrick ? 'Показати попередню взятку' : 'Попередньої взятки немає'}
+        >
+          Попередня взятка
+        </button>
+      </div>
+
       <div className="hand-area">
         <p className="hand-label">Ваші карти ({hand.length})</p>
         <div className="hand-cards">
-          {hand.map((card, idx) => {
+          {sortedHand.map((card, idx) => {
             const legal = isLegal(card);
             const playable = isMyTurn && legal && !ar.isComplete;
             return (
@@ -299,6 +312,56 @@ function PlayingPhase({ room, myId, hand, onCardPlayed }: Props) {
           onClose={() => setJokerModal(null)}
         />
       )}
+
+      {/* Previous trick modal */}
+      {showLastTrick && ar.lastTrick && (
+        <LastTrickModal
+          trick={ar.lastTrick}
+          players={room.players}
+          onClose={() => setShowLastTrick(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Previous trick modal ─────────────────────────────────────────────────────
+
+interface LastTrickModalProps {
+  trick: LastTrick;
+  players: GameRoom['players'];
+  onClose: () => void;
+}
+
+function LastTrickModal({ trick, players, onClose }: LastTrickModalProps) {
+  const winnerName = players.find(p => p.id === trick.winnerId)?.name ?? trick.winnerId;
+  const isRed = (card: Card) => card.suit === 'hearts' || card.suit === 'diamonds';
+
+  return (
+    <div className="last-trick-overlay" onClick={onClose}>
+      <div className="last-trick-modal" onClick={e => e.stopPropagation()}>
+        <div className="last-trick-header">
+          <p className="last-trick-title">Взятка #{trick.trickIndex + 1}</p>
+          <button className="joker-close-btn" onClick={onClose}>✕</button>
+        </div>
+        <div className="last-trick-cards">
+          {trick.plays.map(play => (
+            <div
+              key={play.playerId}
+              className={[
+                'table-card',
+                play.card.isJoker ? 'table-card--joker' : '',
+                isRed(play.card) ? 'table-card--red' : '',
+                play.playerId === trick.winnerId ? 'table-card--winner' : '',
+              ].filter(Boolean).join(' ')}
+            >
+              <span className="table-card-label">{play.card.label}</span>
+              <span className="table-card-player">{play.playerName}</span>
+            </div>
+          ))}
+        </div>
+        <p className="last-trick-winner">Взяв: <strong>{winnerName}</strong></p>
+      </div>
     </div>
   );
 }
