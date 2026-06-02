@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@rozpisnyi-poker/shared": ["../../packages/shared/src/index.ts"]
+    }
+  }
+}

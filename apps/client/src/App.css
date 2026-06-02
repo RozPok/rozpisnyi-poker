@@ -1,0 +1,938 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --green: #1a6e35;
+  --green-dark: #134d26;
+  --gold: #c9a84c;
+  --text: #f0ead6;
+  --surface: rgba(255, 255, 255, 0.06);
+  --radius: 10px;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: radial-gradient(ellipse at center, #1f5c30 0%, #0d2e18 100%);
+  min-height: 100vh;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 2.5rem 2rem;
+  background: var(--surface);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-radius: var(--radius);
+  min-width: 320px;
+  max-width: 420px;
+  width: 100%;
+  backdrop-filter: blur(8px);
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--gold);
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  font-size: 0.95rem;
+  opacity: 0.65;
+  text-align: center;
+}
+
+.btn-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.btn-row {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.btn {
+  flex: 1;
+  padding: 0.75rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--gold);
+  color: #1a1a1a;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.form-group label {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.input {
+  padding: 0.65rem 0.9rem;
+  font-size: 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius);
+  color: var(--text);
+  outline: none;
+  width: 100%;
+}
+
+.input:focus {
+  border-color: var(--gold);
+}
+
+.server-status {
+  font-size: 0.78rem;
+  text-align: center;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
+  letter-spacing: 0.01em;
+}
+
+.server-status--checking {
+  opacity: 0.45;
+}
+
+.server-status--online {
+  color: #86efac;
+}
+
+.server-status--offline {
+  color: #fca5a5;
+}
+
+/* ─── Error message ────────────────────────────────────────────────────────── */
+
+.error {
+  font-size: 0.85rem;
+  text-align: center;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  width: 100%;
+}
+
+/* ─── Code input ───────────────────────────────────────────────────────────── */
+
+.input--code {
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+/* ─── Lobby ────────────────────────────────────────────────────────────────── */
+
+.lobby {
+  max-width: 480px;
+  gap: 1.25rem;
+}
+
+.room-header {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.room-code-block {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+}
+
+.room-code-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+.room-code-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.room-code {
+  font-family: 'Courier New', monospace;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  color: var(--gold);
+}
+
+.btn-copy {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text);
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.btn-copy:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ─── Players section ──────────────────────────────────────────────────────── */
+
+.players-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.player-count {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.need-more {
+  color: #fbbf24;
+}
+
+.player-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.player-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: calc(var(--radius) - 2px);
+}
+
+.player-item--me {
+  border-color: rgba(201, 168, 76, 0.3);
+  background: rgba(201, 168, 76, 0.06);
+}
+
+.player-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.owner-tag {
+  font-size: 0.68rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(201, 168, 76, 0.15);
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+.disconnected-tag {
+  font-size: 0.68rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  white-space: nowrap;
+}
+
+/* ─── Lobby actions ────────────────────────────────────────────────────────── */
+
+.lobby-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* ─── Game started banner ──────────────────────────────────────────────────── */
+
+.game-started-banner {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  color: #86efac;
+  letter-spacing: 0.04em;
+  opacity: 0.9;
+}
+
+/* ─── Game sheet — current round card ─────────────────────────────────────── */
+
+.cur-round-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(201, 168, 76, 0.07);
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.cur-round-meta {
+  font-size: 0.8rem;
+  opacity: 0.65;
+}
+
+.cur-round-main {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.cur-round-badge {
+  font-family: 'Courier New', monospace;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--gold);
+  line-height: 1;
+}
+
+.cur-round-type {
+  font-size: 0.95rem;
+  opacity: 0.8;
+}
+
+.cur-round-cards {
+  font-size: 0.78rem;
+  opacity: 0.55;
+}
+
+/* ─── Game sheet — progress bar ────────────────────────────────────────────── */
+
+.sheet-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.sheet-progress-fill {
+  height: 100%;
+  background: var(--gold);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+/* ─── Game sheet — round list ──────────────────────────────────────────────── */
+
+.round-scroll {
+  width: 100%;
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.round-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid transparent;
+  font-size: 0.82rem;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+
+.round-row--current {
+  opacity: 1;
+  background: rgba(201, 168, 76, 0.1);
+  border-color: rgba(201, 168, 76, 0.35);
+}
+
+.round-row--done {
+  opacity: 0.3;
+}
+
+.round-row--special {
+  color: #fbbf24;
+}
+
+.round-row-num {
+  width: 1.8rem;
+  text-align: right;
+  font-size: 0.72rem;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.round-row-badge {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  font-size: 0.9rem;
+  width: 1.8rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.round-row--current .round-row-badge {
+  color: var(--gold);
+}
+
+.round-row-cards {
+  opacity: 0.55;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.round-row-type {
+  opacity: 0.75;
+  font-size: 0.78rem;
+}
+
+/* ─── Game round pill ──────────────────────────────────────────────────────── */
+
+.game-round-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+
+.grp-badge {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: var(--gold);
+  font-size: 1rem;
+}
+
+.grp-type {
+  font-weight: 600;
+  color: #fbbf24;
+}
+
+.grp-meta {
+  opacity: 0.55;
+  font-size: 0.72rem;
+}
+
+/* ─── Score board — compact ────────────────────────────────────────────────── */
+
+.scoreboard-compact {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.scoreboard-compact-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid transparent;
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.scoreboard-compact-row--me {
+  border-color: rgba(201, 168, 76, 0.25);
+  background: rgba(201, 168, 76, 0.05);
+}
+
+.sbc-name {
+  flex: 1;
+  font-weight: 500;
+}
+
+.sbc-delta {
+  font-size: 0.7rem;
+  font-family: 'Courier New', monospace;
+  min-width: 2rem;
+  text-align: right;
+}
+
+.sbc-delta--pos { color: #86efac; }
+.sbc-delta--neg { color: #fca5a5; }
+
+.sbc-total {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  font-size: 0.9rem;
+  min-width: 2.5rem;
+  text-align: right;
+  color: var(--gold);
+}
+
+/* ─── Score board — full table ─────────────────────────────────────────────── */
+
+.scoreboard-full {
+  width: 100%;
+}
+
+.scoreboard-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.scoreboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.scoreboard-table th,
+.scoreboard-table td {
+  padding: 0.35rem 0.5rem;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.scoreboard-table th {
+  opacity: 0.55;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  font-size: 0.72rem;
+}
+
+.scoreboard-table .sbt-player {
+  text-align: left;
+  min-width: 6rem;
+}
+
+.scoreboard-table .sbt-round {
+  min-width: 2rem;
+}
+
+.scoreboard-table .sbt-total {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: var(--gold);
+  min-width: 3rem;
+}
+
+.sbt-row--me td {
+  background: rgba(201, 168, 76, 0.06);
+}
+
+.sbt-cell--pos { color: #86efac; }
+.sbt-cell--neg { color: #fca5a5; }
+
+/* ─── Bidding phase ────────────────────────────────────────────────────────── */
+
+.bidding-header {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.bidding-round-info {
+  font-size: 0.75rem;
+  opacity: 0.5;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bids-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.bid-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.75rem;
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.85rem;
+  transition: background 0.15s;
+}
+
+.bid-row--me {
+  border-color: rgba(201, 168, 76, 0.2);
+}
+
+.bid-row--active {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.bid-row--done {
+  opacity: 0.75;
+}
+
+.bid-row-name {
+  font-weight: 500;
+}
+
+.bid-row-value {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  font-size: 1rem;
+  min-width: 1.5rem;
+  text-align: right;
+  color: var(--gold);
+}
+
+.bid-input-area {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1rem;
+  background: rgba(201, 168, 76, 0.06);
+  border: 1px solid rgba(201, 168, 76, 0.25);
+  border-radius: var(--radius);
+}
+
+.bid-prompt {
+  font-size: 0.82rem;
+  opacity: 0.75;
+  text-align: center;
+}
+
+.bid-prompt-hint {
+  color: #fbbf24;
+  font-size: 0.75rem;
+}
+
+.bid-options {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
+.bid-option {
+  width: 2.8rem;
+  height: 2.8rem;
+  font-family: 'Courier New', monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, transform 0.1s;
+}
+
+.bid-option:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.bid-option:active {
+  transform: scale(0.93);
+}
+
+.bid-option--selected {
+  background: rgba(201, 168, 76, 0.2);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.bid-no-options {
+  font-size: 0.8rem;
+  opacity: 0.5;
+  text-align: center;
+}
+
+.bid-submit {
+  width: 100%;
+  max-width: 260px;
+}
+
+/* ─── Tricks tally — bid fraction ─────────────────────────────────────────── */
+
+.tally-bid {
+  font-size: 0.65em;
+  opacity: 0.6;
+  margin-left: 0.1em;
+}
+
+/* ─── Hand preview (during bidding) ───────────────────────────────────────── */
+
+.hand-area--preview .hand-card {
+  cursor: default;
+  pointer-events: none;
+}
+
+/* ─── Game screen wrapper ──────────────────────────────────────────────────── */
+
+.game-screen {
+  max-width: 600px;
+  width: 100%;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.game-header {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* ─── Game table ───────────────────────────────────────────────────────────── */
+
+.game-table {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ─── Turn banner ──────────────────────────────────────────────────────────── */
+
+.turn-banner {
+  font-size: 0.9rem;
+  padding: 0.4rem 1.2rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.turn-banner--mine {
+  background: rgba(134, 239, 172, 0.15);
+  border-color: rgba(134, 239, 172, 0.4);
+  color: #86efac;
+  font-weight: 600;
+}
+
+/* ─── Tricks tally ─────────────────────────────────────────────────────────── */
+
+.tricks-tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+}
+
+.tricks-tally-item {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
+}
+
+.tricks-tally-item--me {
+  border-color: rgba(201, 168, 76, 0.35);
+  color: var(--gold);
+}
+
+/* ─── Trick area ───────────────────────────────────────────────────────────── */
+
+.trick-area {
+  width: 100%;
+  min-height: 110px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
+}
+
+.trick-empty {
+  opacity: 0.3;
+  font-size: 0.85rem;
+}
+
+/* ─── Cards on table ───────────────────────────────────────────────────────── */
+
+.table-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.5rem 0.7rem;
+  background: white;
+  color: #1a1a1a;
+  border-radius: 8px;
+  min-width: 52px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.table-card--red { color: #dc2626; }
+
+.table-card--joker {
+  background: linear-gradient(135deg, #ffd700, #ff8c00);
+  color: #1a1a1a;
+}
+
+.table-card-label {
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  line-height: 1;
+}
+
+.table-card-player {
+  font-size: 0.6rem;
+  opacity: 0.55;
+}
+
+/* ─── Round complete ───────────────────────────────────────────────────────── */
+
+.round-complete-banner {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #86efac;
+  text-align: center;
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  background: rgba(134, 239, 172, 0.1);
+  border: 1px solid rgba(134, 239, 172, 0.3);
+}
+
+/* ─── Player hand ──────────────────────────────────────────────────────────── */
+
+.hand-area {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(201, 168, 76, 0.15);
+  border-radius: var(--radius);
+}
+
+.hand-label {
+  font-size: 0.72rem;
+  opacity: 0.5;
+  letter-spacing: 0.04em;
+}
+
+.hand-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
+.hand-card {
+  padding: 0.55rem 0.75rem;
+  font-size: 1rem;
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  background: white;
+  color: #1a1a1a;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+  min-width: 52px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  line-height: 1;
+}
+
+.hand-card:hover:not(:disabled) {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.hand-card:active:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.hand-card:disabled {
+  cursor: not-allowed;
+}
+
+.hand-card--red { color: #dc2626; }
+
+.hand-card--joker {
+  background: linear-gradient(135deg, #ffd700, #ff8c00);
+  color: #1a1a1a;
+}
+
+.hand-card--dim {
+  opacity: 0.5;
+}
