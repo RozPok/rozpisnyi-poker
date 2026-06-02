@@ -5,6 +5,7 @@ import type {
   GameRoom,
   JokerDeclaration,
   PlayResult,
+  Suit,
   TrickPlay,
 } from '@rozpisnyi-poker/shared';
 import {
@@ -13,6 +14,7 @@ import {
   computeScore,
   createDeck,
   dealCards,
+  determineTrump,
   determineTrickWinner,
   getLegalBids,
   shuffleDeck,
@@ -25,19 +27,38 @@ const handsByRoom = new Map<string, Map<string, Card[]>>();
 
 // ─── Dealing ──────────────────────────────────────────────────────────────────
 
+export function getRoundStarterIndex(roundIndex: number, playerCount: number): number {
+  return roundIndex % playerCount;
+}
+
+/**
+ * Returns the card that reveals trump for a deal.
+ * When cards remain after dealing (kitty exists) the first kitty card is used.
+ * When the full deck is dealt the first card of the deck is used (it goes to
+ * player 0's hand — the trump card stays in play).
+ */
+export function pickTrumpCard(deck: Card[], playerCount: number, cardsPerPlayer: number): Card {
+  const kittyStart = playerCount * cardsPerPlayer;
+  return kittyStart < deck.length ? deck[kittyStart]! : deck[0]!;
+}
+
 export interface DealResult {
   handsMap: Map<string, Card[]>;
   activeRound: ActiveRound;
 }
 
-export function dealRound(room: GameRoom): DealResult {
+/**
+ * @param _testDeck  Optional pre-built deck — used only in tests to make
+ *                   trump determination deterministic.
+ */
+export function dealRound(room: GameRoom, _testDeck?: Card[]): DealResult {
   const { gameSheet } = room;
   if (!gameSheet) throw new Error('No game sheet on room');
 
   const roundDef = gameSheet.rounds[gameSheet.currentRoundIndex];
   if (!roundDef) throw new Error('Invalid currentRoundIndex');
 
-  const deck = shuffleDeck(createDeck());
+  const deck = _testDeck ?? shuffleDeck(createDeck());
   const { hands } = dealCards(deck, room.players.length, roundDef.cardsPerPlayer);
 
   const handsMap = new Map<string, Card[]>();
@@ -46,10 +67,20 @@ export function dealRound(room: GameRoom): DealResult {
   });
   handsByRoom.set(room.id, handsMap);
 
-  const firstPlayerId = room.players[0]!.id;
+  const starterIdx = getRoundStarterIndex(gameSheet.currentRoundIndex, room.players.length);
+  const firstPlayerId = room.players[starterIdx]!.id;
 
   // Misere and golden have no bidding phase
   const skipsBidding = roundDef.type === 'misere' || roundDef.type === 'golden';
+
+  // Trump is determined before bidding for normal and dark rounds
+  const withTrump = roundDef.type === 'normal' || roundDef.type === 'dark';
+  let trumpCard: Card | null = null;
+  let trumpSuit: Suit | null = null;
+  if (withTrump) {
+    trumpCard = pickTrumpCard(deck, room.players.length, roundDef.cardsPerPlayer);
+    trumpSuit = determineTrump(trumpCard);
+  }
 
   const activeRound: ActiveRound = {
     roundIndex: gameSheet.currentRoundIndex,
@@ -59,7 +90,8 @@ export function dealRound(room: GameRoom): DealResult {
     currentTrickIndex: 0,
     currentTrick: [],
     leadSuit: null,
-    trumpSuit: null,
+    trumpSuit,
+    trumpCard,
     jokerDeclaration: null,
     currentTurnPlayerId: firstPlayerId,
     trickLeadPlayerId: firstPlayerId,

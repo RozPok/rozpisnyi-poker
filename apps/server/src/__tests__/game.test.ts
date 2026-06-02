@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { GameRoom, GameRound, RoomPlayer, RoundType } from '@rozpisnyi-poker/shared';
-import { getLegalCards } from '@rozpisnyi-poker/shared';
-import { dealRound, finishRound, getHand, placeBid, playCard } from '../game';
+import { createDeck, getLegalCards } from '@rozpisnyi-poker/shared';
+import { dealRound, finishRound, getHand, getRoundStarterIndex, pickTrumpCard, placeBid, playCard } from '../game';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -36,12 +36,16 @@ function makeRoom(playerCount: number, cardsPerPlayer: number): GameRoom {
 /**
  * Room positioned at `roundIndex` with pre-populated bid history per player.
  * bidHistoryByPlayer maps playerId → array of bids for rounds 0..roundIndex-1.
+ *
+ * `overrideStarterId` forces currentTurnPlayerId for testing bid-validation rules
+ * in isolation from turn-order rotation (defaults to p1 for backward compat).
  */
 function makeRoomAtRound(
   playerCount: number,
   cardsPerPlayer: number,
   roundIndex: number,
   bidHistoryByPlayer: Record<string, (number | null)[]>,
+  overrideStarterId?: string,
 ): GameRoom {
   const players = Array.from({ length: playerCount }, (_, i) => makePlayer(`p${i + 1}`));
   const totalRounds = roundIndex + 1;
@@ -78,6 +82,47 @@ function makeRoomAtRound(
     createdAt: Date.now(),
   };
 
+  const { activeRound } = dealRound(room);
+  // Pin the starting player so bid-restriction tests are not affected by rotation
+  const starterId = overrideStarterId ?? players[0]!.id;
+  activeRound.currentTurnPlayerId = starterId;
+  activeRound.trickLeadPlayerId  = starterId;
+  room.activeRound = activeRound;
+  return room;
+}
+
+/**
+ * Minimal room at a specific roundIndex for testing turn-order rotation.
+ * Does NOT override currentTurnPlayerId — uses the real rotation logic.
+ */
+function makeRoomForDeal(playerCount: number, cardsPerPlayer: number, roundIndex: number): GameRoom {
+  const players = Array.from({ length: playerCount }, (_, i) => makePlayer(`p${i + 1}`));
+  const rounds = Array.from({ length: roundIndex + 1 }, (_, i) => ({
+    index: i,
+    type: 'normal' as const,
+    cardsPerPlayer,
+    label: String(cardsPerPlayer),
+  }));
+  const room: GameRoom = {
+    id: `room-deal-${playerCount}-${roundIndex}`,
+    code: 'ROT01',
+    ownerId: 'p1',
+    players,
+    status: 'in-progress',
+    gameSheet: {
+      rounds,
+      scores: players.map(p => ({
+        playerId: p.id,
+        name: p.name,
+        bids:   new Array<number | null>(rounds.length).fill(null),
+        scores: new Array<number | null>(rounds.length).fill(null),
+        total: 0,
+      })),
+      currentRoundIndex: roundIndex,
+    },
+    activeRound: null,
+    createdAt: Date.now(),
+  };
   const { activeRound } = dealRound(room);
   room.activeRound = activeRound;
   return room;
@@ -366,7 +411,10 @@ describe('playCard', () => {
   });
 
   it('rejects playing a card not in hand', () => {
-    expect(playCard(room, 'p1', { suit: 'hearts', rank: 'A', isJoker: false, label: 'A♥' })).toEqual({
+    // Use a card from p2's hand — guaranteed absent from p1's hand (deck has unique cards)
+    const p2Hand = getHand(room.id, 'p2')!;
+    const cardNotInP1Hand = p2Hand.find(c => !c.isJoker) ?? p2Hand[0]!;
+    expect(playCard(room, 'p1', cardNotInP1Hand)).toEqual({
       ok: false,
       error: expect.any(String),
     });
@@ -812,7 +860,8 @@ describe('Joker declaration — highest-suit', () => {
     const h1 = getHand(room.id, 'p1')!;
     const h2 = getHand(room.id, 'p2')!;
     h1[0] = JOKER_CARD;
-    // Give p2 two hearts; only the highest should be accepted
+    // Replace the entire hand so K♥ is definitively the highest heart present
+    for (let i = 0; i < h2.length; i++) h2[i] = { suit: 'clubs', rank: '8', isJoker: false, label: '8♣' };
     h2[0] = { suit: 'hearts', rank: 'K', isJoker: false, label: 'K♥' };
     h2[1] = { suit: 'hearts', rank: '7', isJoker: false, label: '7♥' };
 
@@ -858,6 +907,8 @@ describe('Joker declaration — lowest-suit', () => {
     const h1 = getHand(room.id, 'p1')!;
     const h2 = getHand(room.id, 'p2')!;
     h1[0] = JOKER_CARD;
+    // Replace the entire hand so 7♥ is definitively the lowest heart present
+    for (let i = 0; i < h2.length; i++) h2[i] = { suit: 'clubs', rank: '8', isJoker: false, label: '8♣' };
     h2[0] = { suit: 'hearts', rank: 'A', isJoker: false, label: 'A♥' };
     h2[1] = { suit: 'hearts', rank: '7', isJoker: false, label: '7♥' };
 
@@ -904,5 +955,229 @@ describe('Joker declaration — lay-down', () => {
 
     expect(ar.tricksWon['p3']).toBe(1);
     expect(ar.tricksWon['p1']).toBe(0); // Joker does not win
+  });
+});
+
+// ─── Round starter rotation ───────────────────────────────────────────────────
+
+describe('getRoundStarterIndex', () => {
+  it('returns 0 for round 0 regardless of player count', () => {
+    expect(getRoundStarterIndex(0, 3)).toBe(0);
+    expect(getRoundStarterIndex(0, 4)).toBe(0);
+    expect(getRoundStarterIndex(0, 8)).toBe(0);
+  });
+
+  it('increments by 1 each round', () => {
+    expect(getRoundStarterIndex(1, 4)).toBe(1);
+    expect(getRoundStarterIndex(2, 4)).toBe(2);
+    expect(getRoundStarterIndex(3, 4)).toBe(3);
+  });
+
+  it('wraps back to 0 after reaching playerCount', () => {
+    expect(getRoundStarterIndex(4, 4)).toBe(0);
+    expect(getRoundStarterIndex(5, 4)).toBe(1);
+    expect(getRoundStarterIndex(8, 4)).toBe(0);
+  });
+
+  it('wraps correctly for 3 players', () => {
+    expect(getRoundStarterIndex(3, 3)).toBe(0);
+    expect(getRoundStarterIndex(4, 3)).toBe(1);
+    expect(getRoundStarterIndex(5, 3)).toBe(2);
+  });
+
+  it('wraps correctly for 5 players', () => {
+    expect(getRoundStarterIndex(5, 5)).toBe(0);
+    expect(getRoundStarterIndex(9, 5)).toBe(4);
+  });
+
+  it('wraps correctly for 8 players', () => {
+    expect(getRoundStarterIndex(8, 8)).toBe(0);
+    expect(getRoundStarterIndex(15, 8)).toBe(7);
+    expect(getRoundStarterIndex(16, 8)).toBe(0);
+  });
+});
+
+describe('dealRound — round starter rotation', () => {
+  it.each([
+    [3, 0, 'p1'],
+    [3, 1, 'p2'],
+    [3, 2, 'p3'],
+    [3, 3, 'p1'],
+    [4, 0, 'p1'],
+    [4, 1, 'p2'],
+    [4, 3, 'p4'],
+    [4, 4, 'p1'],
+    [5, 0, 'p1'],
+    [5, 4, 'p5'],
+    [5, 5, 'p1'],
+    [8, 0, 'p1'],
+    [8, 7, 'p8'],
+    [8, 8, 'p1'],
+  ])(
+    '%i players round %i → starter %s',
+    (players, roundIdx, expectedStarter) => {
+      const room = makeRoomForDeal(players, 3, roundIdx);
+      expect(room.activeRound!.currentTurnPlayerId).toBe(expectedStarter);
+      expect(room.activeRound!.trickLeadPlayerId).toBe(expectedStarter);
+    },
+  );
+
+  it('bidding for round 1 (3 players) starts with p2, not p1', () => {
+    const room = makeRoomForDeal(3, 3, 1);
+    expect(placeBid(room, 'p1', 1)).toEqual({ ok: false, error: expect.any(String) });
+    expect(placeBid(room, 'p2', 1)).toEqual({ ok: true });
+  });
+
+  it('bidding order wraps around from the rotation starter', () => {
+    // round 2, 3 players → p3 starts; order: p3 → p1 → p2
+    const room = makeRoomForDeal(3, 3, 2);
+    expect(room.activeRound!.currentTurnPlayerId).toBe('p3');
+    placeBid(room, 'p3', 1);
+    expect(room.activeRound!.currentTurnPlayerId).toBe('p1');
+    placeBid(room, 'p1', 1);
+    expect(room.activeRound!.currentTurnPlayerId).toBe('p2');
+  });
+
+  it('after all bids, playing phase starts from the rotation starter', () => {
+    // round 1, 3 players → p2 starts bidding and first trick
+    const room = makeRoomForDeal(3, 3, 1);
+    // bidding order: p2 → p3 → p1
+    placeBid(room, 'p2', 1);
+    placeBid(room, 'p3', 1);
+    placeBid(room, 'p1', 0);
+    expect(room.activeRound!.phase).toBe('playing');
+    expect(room.activeRound!.currentTurnPlayerId).toBe('p2');
+  });
+
+  it('trick winner leads next trick, overriding the rotation starter', () => {
+    // round 0, p1 starts; force p2 to win trick 1; p2 should lead trick 2
+    const room = makeRoomForDeal(3, 3, 0);
+    expect(room.activeRound!.currentTurnPlayerId).toBe('p1');
+    const ar = room.activeRound!;
+    ar.phase = 'playing';
+    ar.bids = { p1: 1, p2: 1, p3: 0 };
+
+    const h1 = getHand(room.id, 'p1')!;
+    const h2 = getHand(room.id, 'p2')!;
+    h1[0] = { suit: 'hearts', rank: '6',  isJoker: false, label: '6♥' };
+    h2[0] = { suit: 'hearts', rank: 'A',  isJoker: false, label: 'A♥' };
+
+    playCard(room, 'p1', h1[0]!);  // p1 leads low hearts
+    playCard(room, 'p2', h2[0]!);  // p2 plays A♥ — wins
+    playLegalCard(room, 'p3');
+
+    expect(ar.trickLeadPlayerId).toBe('p2');
+    expect(ar.currentTurnPlayerId).toBe('p2');
+  });
+});
+
+// ─── Trump determination ──────────────────────────────────────────────────────
+
+describe('pickTrumpCard', () => {
+  it('returns the first kitty card when cards remain after dealing', () => {
+    const deck = createDeck(); // unshuffled, deterministic
+    // 4 players × 8 cards = 32 dealt; kitty starts at index 32
+    const trump = pickTrumpCard(deck, 4, 8);
+    expect(trump).toEqual(deck[32]);
+  });
+
+  it('returns deck[0] when all cards are dealt (no kitty)', () => {
+    const deck = createDeck();
+    // 3 players × 11 cards = 33 dealt; kitty empty → deck[0]
+    const trump = pickTrumpCard(deck, 3, 11);
+    expect(trump).toEqual(deck[0]);
+  });
+
+  it('returns deck[N] matching kittyStart for various player counts', () => {
+    const deck = createDeck();
+    expect(pickTrumpCard(deck, 3, 5)).toEqual(deck[15]); // 3×5=15
+    expect(pickTrumpCard(deck, 5, 6)).toEqual(deck[30]); // 5×6=30
+    expect(pickTrumpCard(deck, 8, 4)).toEqual(deck[32]); // 8×4=32
+  });
+});
+
+describe('dealRound — trump determination', () => {
+  it('normal round: trumpCard is set before bidding phase begins', () => {
+    const room = makeRoomWithScores(4, 8, 'normal');
+    const ar = room.activeRound!;
+    expect(ar.phase).toBe('bidding');
+    expect(ar.trumpCard).not.toBeNull();
+  });
+
+  it('normal round: trumpSuit matches trumpCard suit', () => {
+    const room = makeRoomWithScores(4, 8, 'normal');
+    const ar = room.activeRound!;
+    if (!ar.trumpCard!.isJoker) {
+      expect(ar.trumpSuit).toBe(ar.trumpCard!.suit);
+    } else {
+      expect(ar.trumpSuit).toBeNull();
+    }
+  });
+
+  it('no-trump round: both trumpCard and trumpSuit are null', () => {
+    const room = makeRoomWithScores(4, 8, 'no-trump');
+    const ar = room.activeRound!;
+    expect(ar.trumpCard).toBeNull();
+    expect(ar.trumpSuit).toBeNull();
+  });
+
+  it('misere round: both trumpCard and trumpSuit are null', () => {
+    const room = makeRoomWithScores(4, 8, 'misere');
+    const ar = room.activeRound!;
+    expect(ar.trumpCard).toBeNull();
+    expect(ar.trumpSuit).toBeNull();
+  });
+
+  it('golden round: both trumpCard and trumpSuit are null', () => {
+    const room = makeRoomWithScores(4, 8, 'golden');
+    const ar = room.activeRound!;
+    expect(ar.trumpCard).toBeNull();
+    expect(ar.trumpSuit).toBeNull();
+  });
+
+  it('4 players × 8 cards: trump card is the kitty card (not in any hand)', () => {
+    const room = makeRoomWithScores(4, 8, 'normal');
+    const ar = room.activeRound!;
+    expect(ar.trumpCard).not.toBeNull();
+    // 4×8=32 dealt → trumpCard = deck[32] → absent from all player hands
+    const allCards = ['p1', 'p2', 'p3', 'p4'].flatMap(id => getHand(room.id, id) ?? []);
+    const foundInHand = allCards.some(
+      c => c.suit === ar.trumpCard!.suit && c.rank === ar.trumpCard!.rank,
+    );
+    expect(foundInHand).toBe(false);
+  });
+
+  it('3 players × 11 cards: trump card is deck[0] and lives in p1\'s hand', () => {
+    const room = makeRoomWithScores(3, 11, 'normal');
+    const ar = room.activeRound!;
+    expect(ar.trumpCard).not.toBeNull();
+    // 3×11=33 = full deck → trumpCard = deck[0] → goes to hands[0][0] = p1's first card
+    const p1Hand = getHand(room.id, 'p1')!;
+    const foundInP1Hand = p1Hand.some(
+      c => c.suit === ar.trumpCard!.suit && c.rank === ar.trumpCard!.rank,
+    );
+    expect(foundInP1Hand).toBe(true);
+  });
+
+  it('Joker as trump card sets trumpSuit to null', () => {
+    // Build a deck with Joker at position 32 (kitty for 4×8=32 dealt)
+    const deck = createDeck();
+    const jokerIdx = deck.findIndex(c => c.isJoker);
+    const kittyPos = 32;
+    [deck[kittyPos], deck[jokerIdx]] = [deck[jokerIdx]!, deck[kittyPos]!];
+
+    const room = makeRoomWithScores(4, 8, 'normal');
+    const { activeRound } = dealRound(room, deck);
+    room.activeRound = activeRound;
+
+    expect(room.activeRound.trumpCard).not.toBeNull();
+    expect(room.activeRound.trumpCard!.isJoker).toBe(true);
+    expect(room.activeRound.trumpSuit).toBeNull();
+  });
+
+  it('dark round: trump is determined the same as a normal round', () => {
+    const room = makeRoomWithScores(4, 8, 'dark');
+    const ar = room.activeRound!;
+    expect(ar.trumpCard).not.toBeNull();
   });
 });

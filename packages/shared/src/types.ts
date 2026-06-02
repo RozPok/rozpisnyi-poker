@@ -117,7 +117,8 @@ export interface ActiveRound {
   currentTrickIndex: number;            // 0-based index of the trick in progress
   currentTrick: TrickPlay[];            // cards played so far in this trick
   leadSuit: Suit | null;               // suit of the first card played (null = not started)
-  trumpSuit: Suit | null;              // trump for this round (null = no-trump or not yet set)
+  trumpSuit: Suit | null;              // trump for this round (null = no-trump)
+  trumpCard: Card | null;              // the card that revealed trump (null for no-trump rounds)
   jokerDeclaration: JokerDeclaration | null; // set when Joker leads a trick
   currentTurnPlayerId: string;         // who must play next (bidding or playing)
   trickLeadPlayerId: string;           // who leads the first trick

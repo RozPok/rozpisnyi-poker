@@ -58,10 +58,7 @@ function BiddingPhase({ room, myId, hand }: Props) {
   return (
     <div className="game-table">
       <div className="bidding-header">
-        <span className="bidding-round-info">
-          Раунд {ar.roundIndex + 1} · {ar.cardsPerPlayer} карт
-        </span>
-        <TrumpBadge room={room} />
+        <RoundInfoPanel room={room} />
         <div className={`turn-banner${isMyTurn ? ' turn-banner--mine' : ''}`}>
           {isMyTurn ? 'Ваша ставка!' : `Ставить: ${currentPlayer?.name ?? '…'}`}
         </div>
@@ -199,7 +196,7 @@ function PlayingPhase({ room, myId, hand, onCardPlayed }: Props) {
         {isMyTurn ? 'Ваш хід!' : `Хід: ${currentPlayer?.name ?? '…'}`}
       </div>
 
-      <TrumpBadge room={room} />
+      <RoundInfoPanel room={room} />
 
       <div className="tricks-tally">
         {room.players.map(p => (
@@ -306,24 +303,49 @@ function PlayingPhase({ room, myId, hand, onCardPlayed }: Props) {
   );
 }
 
-// ─── Trump badge ──────────────────────────────────────────────────────────────
+// ─── Round info panel ─────────────────────────────────────────────────────────
 
-function TrumpBadge({ room }: { room: GameRoom }) {
+function RoundInfoPanel({ room }: { room: GameRoom }) {
   const ar = room.activeRound!;
-  const roundDef = room.gameSheet?.rounds[ar.roundIndex];
+  const gs = room.gameSheet!;
+  const totalRounds = gs.rounds.length;
+  const trumpSuit = ar.trumpSuit;
+  const trumpCard = ar.trumpCard;
+  const redSuit = trumpSuit === 'hearts' || trumpSuit === 'diamonds';
+  const trumpCardRed = trumpCard
+    ? (trumpCard.suit === 'hearts' || trumpCard.suit === 'diamonds')
+    : false;
 
-  if (roundDef?.type === 'no-trump') {
-    return <div className="trump-badge trump-badge--none">Без козиря</div>;
-  }
-
-  if (!ar.trumpSuit) return null;
-
-  const redSuit = ar.trumpSuit === 'hearts' || ar.trumpSuit === 'diamonds';
-  const suitLabel = TRUMP_SUIT_LABELS[ar.trumpSuit];
+  const trumpLabel = trumpSuit ? TRUMP_SUIT_LABELS[trumpSuit] : 'Без козиря';
+  const trumpMod   = !trumpSuit ? 'rip-trump--none' : redSuit ? 'rip-trump--red' : '';
 
   return (
-    <div className={`trump-badge${redSuit ? ' trump-badge--red' : ''}`}>
-      Козир: <strong>{suitLabel}</strong>
+    <div className="round-info-panel">
+      <div className="rip-item">
+        <span className="rip-label">Раунд</span>
+        <span className="rip-value">{ar.roundIndex + 1}/{totalRounds}</span>
+      </div>
+      <div className="rip-divider" />
+      <div className="rip-item">
+        <span className="rip-label">Карт у раунді</span>
+        <span className="rip-value">{ar.cardsPerPlayer}</span>
+      </div>
+      <div className="rip-divider" />
+      <div className="rip-item">
+        <span className="rip-label">Козир</span>
+        <span className={`rip-value rip-trump ${trumpMod}`}>{trumpLabel}</span>
+      </div>
+      {trumpCard && (
+        <>
+          <div className="rip-divider" />
+          <div className="rip-item">
+            <span className="rip-label">Козирна карта</span>
+            <span className={`rip-value${trumpCardRed ? ' rip-trump--red' : ''}`}>
+              {trumpCard.label}
+            </span>
+          </div>
+        </>
+      )}
     </div>
   );
 }
