@@ -936,3 +936,8 @@ body {
 .hand-card--dim {
   opacity: 0.5;
 }
+
+.hand-card--illegal {
+  opacity: 0.3;
+  cursor: not-allowed;
+}

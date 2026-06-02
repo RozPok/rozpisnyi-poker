@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { BidResult, Card, GameRoom, PlayResult } from '@rozpisnyi-poker/shared';
-import { getLegalBids } from '@rozpisnyi-poker/shared';
+import { getLegalBids, getLegalCards } from '@rozpisnyi-poker/shared';
 import { socket } from '../socket.ts';
 
 interface Props {
@@ -154,8 +154,16 @@ function PlayingPhase({ room, myId, hand }: Props) {
   const isMyTurn = ar.currentTurnPlayerId === myId;
   const currentPlayer = room.players.find(p => p.id === ar.currentTurnPlayerId);
 
+  const legalCards = isMyTurn
+    ? getLegalCards(hand, ar.leadSuit, ar.trumpSuit)
+    : [];
+
+  function isLegal(card: Card): boolean {
+    return legalCards.some(c => c.suit === card.suit && c.rank === card.rank);
+  }
+
   function handlePlayCard(card: Card) {
-    if (!isMyTurn) return;
+    if (!isMyTurn || !isLegal(card)) return;
     socket.emit('card:play', card, (result: PlayResult) => {
       if (!result.ok) console.error('[card:play]', result.error);
     });
@@ -213,22 +221,32 @@ function PlayingPhase({ room, myId, hand }: Props) {
       <div className="hand-area">
         <p className="hand-label">Ваші карти ({hand.length})</p>
         <div className="hand-cards">
-          {hand.map((card, idx) => (
-            <button
-              key={`${card.suit}:${card.rank}:${idx}`}
-              className={[
-                'hand-card',
-                !isMyTurn ? 'hand-card--dim' : '',
-                card.isJoker ? 'hand-card--joker' : '',
-                isRed(card) ? 'hand-card--red' : '',
-              ].filter(Boolean).join(' ')}
-              onClick={() => handlePlayCard(card)}
-              disabled={!isMyTurn || ar.isComplete}
-              title={!isMyTurn ? 'Зачекайте свого ходу' : card.label}
-            >
-              {card.label}
-            </button>
-          ))}
+          {hand.map((card, idx) => {
+            const legal = isLegal(card);
+            const playable = isMyTurn && legal && !ar.isComplete;
+            return (
+              <button
+                key={`${card.suit}:${card.rank}:${idx}`}
+                className={[
+                  'hand-card',
+                  !isMyTurn ? 'hand-card--dim' : !legal ? 'hand-card--illegal' : '',
+                  card.isJoker ? 'hand-card--joker' : '',
+                  isRed(card) ? 'hand-card--red' : '',
+                ].filter(Boolean).join(' ')}
+                onClick={() => handlePlayCard(card)}
+                disabled={!playable}
+                title={
+                  !isMyTurn
+                    ? 'Зачекайте свого ходу'
+                    : !legal
+                      ? 'Порушення правила ходу'
+                      : card.label
+                }
+              >
+                {card.label}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

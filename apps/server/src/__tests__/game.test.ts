@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { GameRoom, GameRound, RoomPlayer, RoundType } from '@rozpisnyi-poker/shared';
+import { getLegalCards } from '@rozpisnyi-poker/shared';
 import { dealRound, finishRound, getHand, placeBid, playCard } from '../game';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -80,6 +81,19 @@ function makeRoomAtRound(
   const { activeRound } = dealRound(room);
   room.activeRound = activeRound;
   return room;
+}
+
+/**
+ * Plays the first *legal* card for `playerId` according to the current trick
+ * state. Throws if no legal card is found (shouldn't happen with a valid hand).
+ */
+function playLegalCard(room: GameRoom, playerId: string): void {
+  const ar = room.activeRound!;
+  const hand = getHand(room.id, playerId)!;
+  const legal = getLegalCards(hand, ar.leadSuit, ar.trumpSuit);
+  if (legal.length === 0) throw new Error(`No legal card for ${playerId}`);
+  const result = playCard(room, playerId, legal[0]!);
+  if (!result.ok) throw new Error(`playLegalCard failed: ${result.error}`);
 }
 
 // ─── placeBid — basic validation ─────────────────────────────────────────────
@@ -347,29 +361,20 @@ describe('playCard', () => {
   });
 
   it('clears trick and sets winner as next turn leader after full trick', () => {
-    const h1 = getHand(room.id, 'p1')!;
-    const h2 = getHand(room.id, 'p2')!;
-    const h3 = getHand(room.id, 'p3')!;
-    playCard(room, 'p1', h1[0]!);
-    playCard(room, 'p2', h2[0]!);
-    playCard(room, 'p3', h3[0]!);
+    playLegalCard(room, 'p1');
+    playLegalCard(room, 'p2');
+    playLegalCard(room, 'p3');
     expect(room.activeRound!.currentTrick).toHaveLength(0);
     expect(room.activeRound!.currentTrickIndex).toBe(1);
   });
 
   it('marks round complete when all cards played', () => {
     for (let t = 0; t < 3; t++) {
-      const h1 = getHand(room.id, 'p1')!;
-      const h2 = getHand(room.id, 'p2')!;
-      const h3 = getHand(room.id, 'p3')!;
       const leader = room.activeRound!.currentTurnPlayerId;
       const leaderIdx = room.players.findIndex(p => p.id === leader);
-      const hands = [h1, h2, h3];
       for (let i = 0; i < 3; i++) {
-        const pIdx = (leaderIdx + i) % 3;
-        const pid = `p${pIdx + 1}`;
-        const hand = hands[pIdx]!;
-        playCard(room, pid, hand[0]!);
+        const pid = `p${((leaderIdx + i) % 3) + 1}`;
+        playLegalCard(room, pid);
       }
     }
     expect(room.activeRound!.isComplete).toBe(true);

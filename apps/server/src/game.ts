@@ -1,6 +1,7 @@
 import type { ActiveRound, BidResult, Card, GameRoom, PlayResult, TrickPlay } from '@rozpisnyi-poker/shared';
 import {
   canBidZero,
+  canPlayCard,
   computeScore,
   createDeck,
   dealCards,
@@ -194,6 +195,10 @@ export function playCard(
 
   const cardIdx = hand.findIndex(c => c.suit === card.suit && c.rank === card.rank);
   if (cardIdx === -1) return { ok: false, error: 'Картку не знайдено в руці' };
+
+  if (!canPlayCard(hand, card, ar.leadSuit, ar.trumpSuit)) {
+    return { ok: false, error: 'Порушення правила ходу: потрібно відбити масть або козир' };
+  }
 
   const player = room.players.find(p => p.id === playerId);
   if (!player) return { ok: false, error: 'Гравця не знайдено в кімнаті' };
