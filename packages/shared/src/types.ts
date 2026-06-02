@@ -137,13 +137,19 @@ export type BidResult =
 // ─── Joker declaration ────────────────────────────────────────────────────────
 
 /**
- * Declared mode when a player leads a trick with the Joker.
+ * Declared mode chosen when a player plays the Joker.
  *
- * highest-suit / lowest-suit: requires `suit`.
- * lay-down: no suit; next non-Joker card becomes the effective lead.
+ * Leading Joker (first card of trick):
+ *   highest-suit — all other players must play their highest card of `suit`; Joker wins.
+ *   lowest-suit  — all other players must play their lowest card of `suit`; normal winner.
+ *   lay-down     — no suit declared; next non-Joker establishes lead suit; Joker does not win.
+ *
+ * Non-leading Joker (not first card):
+ *   take      — Joker wins the trick.
+ *   lay-down  — Joker is ignored; trick resolved normally among non-Joker cards.
  */
 export interface JokerDeclaration {
-  mode: 'highest-suit' | 'lowest-suit' | 'lay-down';
+  mode: 'highest-suit' | 'lowest-suit' | 'lay-down' | 'take';
   suit?: Suit;
 }
 

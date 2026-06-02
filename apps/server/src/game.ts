@@ -219,6 +219,16 @@ export function playCard(
     }
   }
 
+  // When Joker is played non-first, only 'take' or 'lay-down' are allowed
+  if (ar.currentTrick.length > 0 && card.isJoker) {
+    if (!declaration) {
+      return { ok: false, error: 'Необхідно вибрати режим Джокера' };
+    }
+    if (declaration.mode !== 'take' && declaration.mode !== 'lay-down') {
+      return { ok: false, error: 'Для не-першого Джокера дозволено лише "забираю" або "підкладаюсь"' };
+    }
+  }
+
   // Validate card legality using the declaration already stored for this trick
   // (null for the Joker leader itself — any card is legal when leadSuit is null)
   if (!canPlayCard(hand, card, ar.leadSuit, ar.trumpSuit, ar.jokerDeclaration ?? undefined)) {
@@ -245,6 +255,10 @@ export function playCard(
   } else if (ar.jokerDeclaration?.mode === 'lay-down' && ar.leadSuit === null && !card.isJoker) {
     // First non-Joker in a lay-down trick establishes the effective lead suit
     ar.leadSuit = card.suit;
+  } else if (ar.currentTrick.length > 0 && card.isJoker && declaration?.mode === 'lay-down') {
+    // Non-leading Joker with lay-down: mark so determineTrickWinner excludes it
+    ar.jokerDeclaration = { mode: 'lay-down' };
+    // 'take' mode: no state change needed — Joker wins via cardBeats as usual
   }
 
   const trickPlay: TrickPlay = { playerId, playerName: player.name, card };

@@ -55,8 +55,8 @@ export function determineTrickWinner(
 ): string {
   if (trick.length === 0) throw new Error('Cannot determine winner of an empty trick');
 
-  // highest-suit: Joker wins unconditionally
-  if (jokerDeclaration?.mode === 'highest-suit') {
+  // highest-suit (leading) and take (non-leading): Joker wins unconditionally
+  if (jokerDeclaration?.mode === 'highest-suit' || jokerDeclaration?.mode === 'take') {
     const jokerPlay = trick.find(p => p.card.isJoker);
     if (jokerPlay) return jokerPlay.playerId;
   }

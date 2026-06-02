@@ -146,8 +146,9 @@ function BiddingPhase({ room, myId, hand }: Props) {
 // ─── Playing phase ────────────────────────────────────────────────────────────
 
 type JokerModalState =
-  | { step: 'mode'; card: Card }
-  | { step: 'suit'; card: Card; mode: 'highest-suit' | 'lowest-suit' };
+  | { step: 'mode'; card: Card }                                          // leading — choose mode
+  | { step: 'suit'; card: Card; mode: 'highest-suit' | 'lowest-suit' }   // leading — choose suit
+  | { step: 'non-leading'; card: Card };                                  // non-leading — take / lay-down
 
 function PlayingPhase({ room, myId, hand }: Props) {
   const ar = room.activeRound!;
@@ -171,9 +172,14 @@ function PlayingPhase({ room, myId, hand }: Props) {
 
   function handleCardClick(card: Card) {
     if (!isMyTurn || !isLegal(card)) return;
-    // Joker leading a trick → show declaration modal
-    if (card.isJoker && ar.currentTrick.length === 0) {
-      setJokerModal({ step: 'mode', card });
+    if (card.isJoker) {
+      // Leading Joker → choose mode (highest-suit / lowest-suit / lay-down)
+      if (ar.currentTrick.length === 0) {
+        setJokerModal({ step: 'mode', card });
+      } else {
+        // Non-leading Joker → choose take or lay-down
+        setJokerModal({ step: 'non-leading', card });
+      }
       return;
     }
     emit(card, null);
@@ -280,6 +286,10 @@ function PlayingPhase({ room, myId, hand }: Props) {
             }
             setJokerModal(null);
           }}
+          onNonLeading={mode => {
+            emit(jokerModal.card, { mode });
+            setJokerModal(null);
+          }}
           onBack={() => setJokerModal({ step: 'mode', card: jokerModal.card })}
           onClose={() => setJokerModal(null)}
         />
@@ -301,11 +311,12 @@ interface JokerModalProps {
   state: JokerModalState;
   onSelectMode: (mode: 'highest-suit' | 'lowest-suit' | 'lay-down') => void;
   onSelectSuit: (suit: Suit) => void;
+  onNonLeading: (mode: 'take' | 'lay-down') => void;
   onBack: () => void;
   onClose: () => void;
 }
 
-function JokerModal({ state, onSelectMode, onSelectSuit, onBack, onClose }: JokerModalProps) {
+function JokerModal({ state, onSelectMode, onSelectSuit, onNonLeading, onBack, onClose }: JokerModalProps) {
   return (
     <div className="joker-modal-overlay" onClick={onClose}>
       <div className="joker-modal" onClick={e => e.stopPropagation()}>
@@ -346,6 +357,19 @@ function JokerModal({ state, onSelectMode, onSelectSuit, onBack, onClose }: Joke
           </>
         )}
 
+        {state.step === 'non-leading' && (
+          <div className="joker-modal-options">
+            <button className="joker-mode-btn" onClick={() => onNonLeading('take')}>
+              <span className="jmb-name">Забираю</span>
+              <span className="jmb-desc">Жопа виграє хід</span>
+            </button>
+            <button className="joker-mode-btn" onClick={() => onNonLeading('lay-down')}>
+              <span className="jmb-name">Підкладаюсь</span>
+              <span className="jmb-desc">Жопа ігнорується, перемагає краща карта</span>
+            </button>
+          </div>
+        )}
+
         <button className="joker-close-btn" onClick={onClose}>✕</button>
       </div>
     </div>
@@ -363,5 +387,6 @@ function jokerDeclarationLabel(d: JokerDeclaration): string {
     case 'highest-suit': return `Стара масть${suit}`;
     case 'lowest-suit':  return `Молодша масть${suit}`;
     case 'lay-down':     return 'Підкладання';
+    case 'take':         return 'Забираю';
   }
 }

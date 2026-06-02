@@ -330,3 +330,78 @@ describe('determineTrickWinner — lay-down', () => {
     ).toThrow();
   });
 });
+
+// ─── Non-leading Joker — take ─────────────────────────────────────────────────
+
+describe('determineTrickWinner — non-leading Joker, take', () => {
+  it('Joker wins over all previous cards', () => {
+    // A♠, Joker(take), K♠, 8♠ → Joker wins
+    const trick = [
+      play('p1', card('spades', 'A')),
+      play('p2', joker()),
+      play('p3', card('spades', 'K')),
+      play('p4', card('spades', '8')),
+    ];
+    expect(determineTrickWinner(trick, 'spades', null, { mode: 'take' })).toBe('p2');
+  });
+
+  it('Joker wins over lead-suit ace', () => {
+    const trick = [
+      play('p1', card('hearts', 'A')),
+      play('p2', joker()),
+    ];
+    expect(determineTrickWinner(trick, 'hearts', null, { mode: 'take' })).toBe('p2');
+  });
+
+  it('Joker wins over trump', () => {
+    const trick = [
+      play('p1', card('hearts', '7')),   // lead
+      play('p2', card('spades', 'A')),   // highest trump
+      play('p3', joker()),               // Joker takes
+    ];
+    expect(determineTrickWinner(trick, 'hearts', 'spades', { mode: 'take' })).toBe('p3');
+  });
+});
+
+// ─── Non-leading Joker — lay-down ────────────────────────────────────────────
+
+describe('determineTrickWinner — non-leading Joker, lay-down', () => {
+  it('Joker is ignored; highest lead-suit card wins', () => {
+    // A♠, Joker(lay-down), K♠, 8♠ → A♠ wins
+    const trick = [
+      play('p1', card('spades', 'A')),
+      play('p2', joker()),
+      play('p3', card('spades', 'K')),
+      play('p4', card('spades', '8')),
+    ];
+    expect(determineTrickWinner(trick, 'spades', null, { mode: 'lay-down' })).toBe('p1');
+  });
+
+  it('trump wins over lead suit when Joker is lay-down', () => {
+    const trick = [
+      play('p1', card('hearts', 'A')),   // lead suit
+      play('p2', joker()),               // lay-down — ignored
+      play('p3', card('spades', '7')),   // trump
+    ];
+    expect(determineTrickWinner(trick, 'hearts', 'spades', { mode: 'lay-down' })).toBe('p3');
+  });
+
+  it('highest trump wins when multiple trumps and Joker is lay-down', () => {
+    const trick = [
+      play('p1', card('hearts', 'A')),
+      play('p2', joker()),
+      play('p3', card('spades', '7')),
+      play('p4', card('spades', 'K')),   // higher trump
+    ];
+    expect(determineTrickWinner(trick, 'hearts', 'spades', { mode: 'lay-down' })).toBe('p4');
+  });
+
+  it('first card wins when no one follows suit or plays trump and Joker is lay-down', () => {
+    const trick = [
+      play('p1', card('hearts', '7')),   // lead
+      play('p2', joker()),               // ignored
+      play('p3', card('clubs', 'A')),    // off-suit, cannot win
+    ];
+    expect(determineTrickWinner(trick, 'hearts', null, { mode: 'lay-down' })).toBe('p1');
+  });
+});

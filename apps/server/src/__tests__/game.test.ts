@@ -94,11 +94,12 @@ function playLegalCard(room: GameRoom, playerId: string): void {
   const legal = getLegalCards(hand, ar.leadSuit, ar.trumpSuit, ar.jokerDeclaration ?? undefined);
   if (legal.length === 0) throw new Error(`No legal card for ${playerId}`);
   const card = legal[0]!;
-  // Joker leading a trick requires a declaration; default to lay-down
-  const declaration =
-    card.isJoker && ar.currentTrick.length === 0
+  // Joker always requires a declaration; choose lay-down when leading, take when not
+  const declaration = card.isJoker
+    ? ar.currentTrick.length === 0
       ? { mode: 'lay-down' as const }
-      : null;
+      : { mode: 'take' as const }
+    : null;
   const result = playCard(room, playerId, card, declaration);
   if (!result.ok) throw new Error(`playLegalCard failed: ${result.error}`);
 }
@@ -609,8 +610,8 @@ describe('playCard — Joker wins trick', () => {
     h1[0] = { suit: 'spades', rank: 'A', isJoker: false, label: 'A♠' }; // highest trump
     h2[0] = JOKER_CARD;
 
-    playCard(room, 'p1', h1[0]!);  // trump ace leads
-    playCard(room, 'p2', JOKER_CARD); // Joker overrides
+    playCard(room, 'p1', h1[0]!);                         // trump ace leads
+    playCard(room, 'p2', JOKER_CARD, { mode: 'take' });   // non-leading Joker takes
     playLegalCard(room, 'p3');
 
     expect(ar.tricksWon['p2']).toBe(1);
@@ -653,11 +654,112 @@ describe('playCard — Joker wins trick', () => {
 
     // highest-suit: p1 (Joker declarant) wins unconditionally regardless of other Jokers
     playCard(room, 'p1', h1[0]!, { mode: 'highest-suit', suit: 'hearts' });
-    playCard(room, 'p2', h2[0]!); // second Joker — Jokers are always legal, but p1 wins
+    playCard(room, 'p2', h2[0]!, { mode: 'take' }); // second Joker (non-leading) — p1 still wins
     playLegalCard(room, 'p3');
 
     expect(ar.tricksWon['p1']).toBe(1); // first Joker (declarant) wins
     expect(ar.tricksWon['p2']).toBe(0);
+  });
+});
+
+// ─── Non-leading Joker integration ───────────────────────────────────────────
+
+describe('playCard — non-leading Joker validation', () => {
+  it('rejects non-leading Joker without a declaration', () => {
+    const room = makeRoomWithScores(3, 3, 'normal');
+    const ar = room.activeRound!;
+    ar.phase = 'playing';
+    ar.bids = { p1: 1, p2: 1, p3: 0 };
+    const h1 = getHand(room.id, 'p1')!;
+    const h2 = getHand(room.id, 'p2')!;
+    h1[0] = { suit: 'hearts', rank: 'A', isJoker: false, label: 'A♥' };
+    h2[0] = JOKER_CARD;
+    playCard(room, 'p1', h1[0]!); // normal lead
+    expect(playCard(room, 'p2', JOKER_CARD)).toEqual({ ok: false, error: expect.any(String) });
+  });
+
+  it('rejects non-leading Joker with a leading-only mode', () => {
+    const room = makeRoomWithScores(3, 3, 'normal');
+    const ar = room.activeRound!;
+    ar.phase = 'playing';
+    ar.bids = { p1: 1, p2: 1, p3: 0 };
+    const h1 = getHand(room.id, 'p1')!;
+    const h2 = getHand(room.id, 'p2')!;
+    h1[0] = { suit: 'hearts', rank: 'A', isJoker: false, label: 'A♥' };
+    h2[0] = JOKER_CARD;
+    playCard(room, 'p1', h1[0]!);
+    expect(playCard(room, 'p2', JOKER_CARD, { mode: 'highest-suit', suit: 'hearts' }))
+      .toEqual({ ok: false, error: expect.any(String) });
+  });
+
+  it('accepts take and lay-down for non-leading Joker', () => {
+    for (const mode of ['take', 'lay-down'] as const) {
+      const room = makeRoomWithScores(3, 3, 'normal');
+      const ar = room.activeRound!;
+      ar.phase = 'playing';
+      ar.bids = { p1: 1, p2: 1, p3: 0 };
+      const h1 = getHand(room.id, 'p1')!;
+      const h2 = getHand(room.id, 'p2')!;
+      h1[0] = { suit: 'hearts', rank: 'A', isJoker: false, label: 'A♥' };
+      h2[0] = JOKER_CARD;
+      playCard(room, 'p1', h1[0]!);
+      expect(playCard(room, 'p2', JOKER_CARD, { mode })).toEqual({ ok: true });
+    }
+  });
+});
+
+describe('playCard — non-leading Joker modes', () => {
+  function setupNonLeadingJoker() {
+    const room = makeRoomWithScores(3, 3, 'normal');
+    const ar = room.activeRound!;
+    ar.phase = 'playing';
+    ar.bids = { p1: 1, p2: 1, p3: 0 };
+    const h1 = getHand(room.id, 'p1')!;
+    const h2 = getHand(room.id, 'p2')!;
+    // p1 leads with a spades card; p2 has the Joker
+    h1[0] = { suit: 'spades', rank: 'A', isJoker: false, label: 'A♠' };
+    h2[0] = JOKER_CARD;
+    return { room, ar, h1, h2 };
+  }
+
+  it('take: Joker wins the trick over lead-suit ace', () => {
+    const { room, ar, h1, h2 } = setupNonLeadingJoker();
+    playCard(room, 'p1', h1[0]!);                        // A♠ leads
+    playCard(room, 'p2', h2[0]!, { mode: 'take' });      // Joker takes
+    playLegalCard(room, 'p3');
+    expect(ar.tricksWon['p2']).toBe(1);
+    expect(ar.tricksWon['p1']).toBe(0);
+  });
+
+  it('lay-down: A♠ wins when Joker is ignored', () => {
+    const { room, ar, h1, h2 } = setupNonLeadingJoker();
+    playCard(room, 'p1', h1[0]!);                          // A♠ leads
+    playCard(room, 'p2', h2[0]!, { mode: 'lay-down' });   // Joker laid down
+    playLegalCard(room, 'p3');
+    expect(ar.tricksWon['p1']).toBe(1); // A♠ is the best non-Joker card
+    expect(ar.tricksWon['p2']).toBe(0);
+  });
+
+  it('lay-down: sets jokerDeclaration so winner logic excludes Joker', () => {
+    const { room, ar, h1, h2 } = setupNonLeadingJoker();
+    playCard(room, 'p1', h1[0]!);
+    playCard(room, 'p2', h2[0]!, { mode: 'lay-down' });
+    expect(ar.jokerDeclaration).toEqual({ mode: 'lay-down' });
+  });
+
+  it('take: does not set jokerDeclaration (Joker wins via normal path)', () => {
+    const { room, ar, h1, h2 } = setupNonLeadingJoker();
+    playCard(room, 'p1', h1[0]!);
+    playCard(room, 'p2', h2[0]!, { mode: 'take' });
+    expect(ar.jokerDeclaration).toBeNull();
+  });
+
+  it('jokerDeclaration is cleared after trick completes', () => {
+    const { room, ar, h1, h2 } = setupNonLeadingJoker();
+    playCard(room, 'p1', h1[0]!);
+    playCard(room, 'p2', h2[0]!, { mode: 'lay-down' });
+    playLegalCard(room, 'p3');
+    expect(ar.jokerDeclaration).toBeNull();
   });
 });
 
