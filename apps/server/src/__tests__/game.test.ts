@@ -620,6 +620,76 @@ describe('finishRound — round progression', () => {
   });
 });
 
+// ─── Hand sizes across round progression ─────────────────────────────────────
+
+describe('finishRound — hand sizes', () => {
+  it('every player receives exactly cardsPerPlayer cards for the next round', () => {
+    // Round 0: 3 cards → Round 1: 4 cards
+    const room = makeRoomWithScores(3, 3, 'normal', [
+      { index: 1, type: 'normal', cardsPerPlayer: 4, label: '4' },
+    ]);
+    forceComplete(room, { p1: 1, p2: 1, p3: 0 }, { p1: 1, p2: 1, p3: 1 });
+    const { nextHandsMap } = finishRound(room);
+
+    expect(nextHandsMap).not.toBeNull();
+    for (const player of room.players) {
+      expect(nextHandsMap!.get(player.id)!.length).toBe(4);
+      expect(getHand(room.id, player.id)!.length).toBe(4);
+    }
+  });
+
+  it.each([1, 2, 3, 4])(
+    '3-player game: %i cards per player are dealt at round start',
+    (cardsPerPlayer) => {
+      const room = makeRoomWithScores(3, cardsPerPlayer, 'normal');
+      for (const player of room.players) {
+        expect(getHand(room.id, player.id)!.length).toBe(cardsPerPlayer);
+      }
+    },
+  );
+
+  it('hand sizes are correct for rounds 1→2→3 in sequence for 3 players', () => {
+    const roundDefs = [
+      { index: 0, type: 'normal' as const, cardsPerPlayer: 1, label: '1' },
+      { index: 1, type: 'normal' as const, cardsPerPlayer: 2, label: '2' },
+      { index: 2, type: 'normal' as const, cardsPerPlayer: 3, label: '3' },
+    ];
+    const players = Array.from({ length: 3 }, (_, i) => makePlayer(`p${i + 1}`));
+    const room: GameRoom = {
+      id: 'room-hand-size-seq',
+      code: 'HSIZE',
+      ownerId: 'p1',
+      players,
+      status: 'in-progress',
+      gameSheet: {
+        rounds: roundDefs,
+        scores: players.map(p => ({
+          playerId: p.id, name: p.name,
+          bids:   new Array<number | null>(3).fill(null),
+          scores: new Array<number | null>(3).fill(null),
+          total: 0,
+        })),
+        currentRoundIndex: 0,
+      },
+      activeRound: null,
+      createdAt: Date.now(),
+    };
+    const { activeRound: ar0 } = dealRound(room);
+    room.activeRound = ar0;
+    for (const p of players) expect(getHand(room.id, p.id)!.length).toBe(1);
+
+    forceComplete(room, { p1: 0, p2: 0, p3: 0 }, { p1: 0, p2: 1, p3: 0 });
+    const { nextHandsMap: m1 } = finishRound(room);
+    expect(m1).not.toBeNull();
+    for (const p of players) expect(m1!.get(p.id)!.length).toBe(2);
+
+    forceComplete(room, { p1: 1, p2: 0, p3: 0 }, { p1: 1, p2: 1, p3: 0 });
+    const { nextHandsMap: m2 } = finishRound(room);
+    expect(m2).not.toBeNull();
+    for (const p of players) expect(m2!.get(p.id)!.length).toBe(3);
+  });
+});
+
 // ─── Joker integration ────────────────────────────────────────────────────────
 
 const JOKER_CARD = { suit: 'joker' as const, rank: 'joker' as const, isJoker: true, label: 'Жопа' };

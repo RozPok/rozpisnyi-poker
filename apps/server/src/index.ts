@@ -153,6 +153,12 @@ io.on('connection', socket => {
       return;
     }
 
+    // Acknowledge before emitting room events so the client's onCardPlayed
+    // callback (which removes the card from the local hand) fires before
+    // hand:dealt arrives — otherwise hand:dealt sets the new hand and
+    // onCardPlayed immediately strips one card from it.
+    callback(result);
+
     if (room.activeRound?.isComplete) {
       const { nextHandsMap } = game.finishRound(room);
       io.to(room.id).emit('room:updated', room);
@@ -164,8 +170,6 @@ io.on('connection', socket => {
     } else {
       io.to(room.id).emit('room:updated', room);
     }
-
-    callback(result);
   });
 
   // ── disconnect ──────────────────────────────────────────────────────────────
