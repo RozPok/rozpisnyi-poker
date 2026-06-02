@@ -207,8 +207,10 @@ export default function Lobby({ room, myId, hand, onLeave, onCardPlayed }: Props
   }
 
   // ── waiting lobby ────────────────────────────────────────────────────────────
-  const canStart = room.players.length >= ROOM_MIN_PLAYERS;
-  const needMore = ROOM_MIN_PLAYERS - room.players.length;
+  const connectedCount = room.players.filter(p => p.isConnected).length;
+  const canStart = connectedCount >= ROOM_MIN_PLAYERS;
+  const waitingForReconnect = room.players.length >= ROOM_MIN_PLAYERS && !canStart;
+  const needMore = Math.max(0, ROOM_MIN_PLAYERS - room.players.length);
 
   return (
     <main className="screen lobby">
@@ -242,14 +244,19 @@ export default function Lobby({ room, myId, hand, onLeave, onCardPlayed }: Props
 
       <div className="lobby-actions">
         {isOwner && (
-          <button
-            className="btn btn-primary"
-            onClick={handleStart}
-            disabled={!canStart || isStarting}
-            title={canStart ? undefined : `Потрібно мінімум ${ROOM_MIN_PLAYERS} гравців`}
-          >
-            {isStarting ? 'Запуск…' : 'Почати гру'}
-          </button>
+          <>
+            {waitingForReconnect && (
+              <p className="lobby-waiting-msg">Очікуємо підключення гравців…</p>
+            )}
+            <button
+              className="btn btn-primary"
+              onClick={handleStart}
+              disabled={!canStart || isStarting}
+              title={needMore > 0 ? `Потрібно мінімум ${ROOM_MIN_PLAYERS} гравців` : undefined}
+            >
+              {isStarting ? 'Запуск…' : 'Почати гру'}
+            </button>
+          </>
         )}
         <button className="btn btn-secondary" onClick={handleLeave} disabled={isLeaving}>
           {isLeaving ? 'Виходимо…' : 'Вийти'}

@@ -14,10 +14,13 @@ function getOrCreatePlayerId(): string {
   return id;
 }
 
+/** Stable player identity — persists across refreshes and socket reconnects. */
+export const myPlayerId = getOrCreatePlayerId();
+
 // io() returns Socket<any,any>; cast to the typed variant so all emit/on calls are checked
 export const socket = io(SERVER_URL, {
   autoConnect: false,
-  auth: { playerId: getOrCreatePlayerId() },
+  auth: { playerId: myPlayerId },
 }) as Socket<ServerToClientEvents, ClientToServerEvents>;
 
 // ─── Session helpers ─────────────────────────────────────────────────────────

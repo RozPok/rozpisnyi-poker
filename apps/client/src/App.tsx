@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Card, GameRoom } from '@rozpisnyi-poker/shared';
-import { socket, saveSession, loadSession, clearSession } from './socket.ts';
+import { socket, myPlayerId, saveSession, loadSession, clearSession } from './socket.ts';
 import Home from './pages/Home.tsx';
 import Lobby from './pages/Lobby.tsx';
 
@@ -9,7 +9,8 @@ type Page = 'home' | 'lobby' | 'restoring';
 export default function App() {
   const [page, setPage] = useState<Page>('restoring');
   const [room, setRoom] = useState<GameRoom | null>(null);
-  const [myId, setMyId] = useState('');
+  // myId is the stable player UUID — never changes across socket reconnects.
+  const myId = myPlayerId;
   const [myHand, setMyHand] = useState<Card[]>([]);
   const [restoreError, setRestoreError] = useState('');
 
@@ -22,8 +23,6 @@ export default function App() {
     socket.connect();
 
     socket.on('connect', () => {
-      setMyId(socket.id ?? '');
-
       const session = loadSession();
 
       if (!session) {
@@ -52,7 +51,6 @@ export default function App() {
     socket.on('hand:dealt', hand => setMyHand(hand));
 
     socket.on('disconnect', () => {
-      setMyId('');
       // Keep room/hand state alive — socket.io will attempt to reconnect
       // automatically and the 'connect' handler above will restore the session.
       // Only reset to home if we were not in a room at all.
