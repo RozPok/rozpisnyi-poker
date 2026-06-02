@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Card, GameRoom, GameRound } from '@rozpisnyi-poker/shared';
-import { ROOM_MIN_PLAYERS, ROOM_MAX_PLAYERS, ROUND_TYPE_LABELS } from '@rozpisnyi-poker/shared';
+import { ROOM_MIN_PLAYERS, ROOM_MAX_PLAYERS, ROUND_TYPE_LABELS, TRUMP_SUIT_LABELS } from '@rozpisnyi-poker/shared';
 import { socket } from '../socket.ts';
 import GameTable from '../components/GameTable.tsx';
 import ScoreBoard from '../components/ScoreBoard.tsx';
@@ -95,6 +95,9 @@ export default function Lobby({ room, myId, hand, onLeave, onCardPlayed }: Props
     // Active round: show game table + compact score board
     if (room.activeRound) {
       const curRound = gameSheet.rounds[gameSheet.currentRoundIndex];
+      const trumpSuit = room.activeRound.trumpSuit;
+      const showTrump = !!trumpSuit && curRound?.type !== 'no-trump';
+      const trumpRed  = trumpSuit === 'hearts' || trumpSuit === 'diamonds';
       return (
         <main className="screen game-screen">
           <div className="game-header">
@@ -103,8 +106,15 @@ export default function Lobby({ room, myId, hand, onLeave, onCardPlayed }: Props
               {curRound && (
                 <>
                   <span className="grp-badge">{curRound.label}</span>
-                  {curRound.type !== 'normal' && (
+                  {curRound.type === 'no-trump' ? (
+                    <span className="grp-type">Без козиря</span>
+                  ) : curRound.type !== 'normal' ? (
                     <span className="grp-type">{ROUND_TYPE_LABELS[curRound.type]}</span>
+                  ) : null}
+                  {showTrump && (
+                    <span className={`grp-trump${trumpRed ? ' grp-trump--red' : ''}`}>
+                      {TRUMP_SUIT_LABELS[trumpSuit!]}
+                    </span>
                   )}
                   <span className="grp-meta">
                     {gameSheet.currentRoundIndex + 1}/{gameSheet.rounds.length} · {curRound.cardsPerPlayer} карт

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { BidResult, Card, GameRoom, JokerDeclaration, PlayResult, Suit } from '@rozpisnyi-poker/shared';
-import { getLegalBids, getLegalCards } from '@rozpisnyi-poker/shared';
+import { getLegalBids, getLegalCards, TRUMP_SUIT_LABELS } from '@rozpisnyi-poker/shared';
 import { socket } from '../socket.ts';
 
 interface Props {
@@ -61,6 +61,7 @@ function BiddingPhase({ room, myId, hand }: Props) {
         <span className="bidding-round-info">
           Раунд {ar.roundIndex + 1} · {ar.cardsPerPlayer} карт
         </span>
+        <TrumpBadge room={room} />
         <div className={`turn-banner${isMyTurn ? ' turn-banner--mine' : ''}`}>
           {isMyTurn ? 'Ваша ставка!' : `Ставить: ${currentPlayer?.name ?? '…'}`}
         </div>
@@ -198,6 +199,8 @@ function PlayingPhase({ room, myId, hand, onCardPlayed }: Props) {
         {isMyTurn ? 'Ваш хід!' : `Хід: ${currentPlayer?.name ?? '…'}`}
       </div>
 
+      <TrumpBadge room={room} />
+
       <div className="tricks-tally">
         {room.players.map(p => (
           <span
@@ -299,6 +302,28 @@ function PlayingPhase({ room, myId, hand, onCardPlayed }: Props) {
           onClose={() => setJokerModal(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ─── Trump badge ──────────────────────────────────────────────────────────────
+
+function TrumpBadge({ room }: { room: GameRoom }) {
+  const ar = room.activeRound!;
+  const roundDef = room.gameSheet?.rounds[ar.roundIndex];
+
+  if (roundDef?.type === 'no-trump') {
+    return <div className="trump-badge trump-badge--none">Без козиря</div>;
+  }
+
+  if (!ar.trumpSuit) return null;
+
+  const redSuit = ar.trumpSuit === 'hearts' || ar.trumpSuit === 'diamonds';
+  const suitLabel = TRUMP_SUIT_LABELS[ar.trumpSuit];
+
+  return (
+    <div className={`trump-badge${redSuit ? ' trump-badge--red' : ''}`}>
+      Козир: <strong>{suitLabel}</strong>
     </div>
   );
 }

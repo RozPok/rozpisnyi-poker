@@ -1,4 +1,4 @@
-import type { GameRound, GameSheet, RoundType } from './types.js';
+import type { GameRound, GameSheet, RoundType, Suit } from './types.js';
 import { ROOM_MIN_PLAYERS, ROOM_MAX_PLAYERS } from './types.js';
 
 // ─── Display labels ───────────────────────────────────────────────────────────
@@ -9,6 +9,13 @@ export const ROUND_TYPE_LABELS: Record<RoundType, string> = {
   dark:        'Темна',
   misere:      'Мізер',
   golden:      'Золота',
+};
+
+export const TRUMP_SUIT_LABELS: Record<Suit, string> = {
+  spades:   'Піка ♠',
+  hearts:   'Чирва ♥',
+  diamonds: 'Буба ♦',
+  clubs:    'Хреста ♣',
 };
 
 // ─── Generator ────────────────────────────────────────────────────────────────
