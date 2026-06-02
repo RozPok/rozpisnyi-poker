@@ -9,11 +9,15 @@ type HomeView = 'menu' | 'create' | 'join';
 interface Props {
   onRoomJoined: (room: GameRoom, playerName: string) => void;
   restoreError?: string;
+  /** Name pre-filled from Telegram initDataUnsafe.user */
+  tgPlayerName?: string;
+  /** True when running inside the Telegram Mini App WebView */
+  isTgMode?: boolean;
 }
 
-export default function Home({ onRoomJoined, restoreError }: Props) {
+export default function Home({ onRoomJoined, restoreError, tgPlayerName, isTgMode }: Props) {
   const [view, setView] = useState<HomeView>('menu');
-  const [playerName, setPlayerName] = useState('');
+  const [playerName, setPlayerName] = useState(tgPlayerName ?? '');
   const [roomCode, setRoomCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -22,7 +26,7 @@ export default function Home({ onRoomJoined, restoreError }: Props) {
   function back() {
     setView('menu');
     setError('');
-    setPlayerName('');
+    setPlayerName(tgPlayerName ?? '');
     setRoomCode('');
   }
 
@@ -134,6 +138,7 @@ export default function Home({ onRoomJoined, restoreError }: Props) {
     <main className="screen">
       <h1 className="title">Розписний Покер</h1>
       <p className="subtitle">Онлайн карткова гра</p>
+      {isTgMode && <div className="tg-mode-badge">Telegram режим</div>}
       {restoreError && <p className="error">{restoreError}</p>}
       <div className="btn-col">
         <button className="btn btn-primary" onClick={() => setView('create')}>

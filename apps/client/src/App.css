@@ -325,6 +325,18 @@ body {
   padding: 0.4rem 0.75rem;
 }
 
+/* ─── Telegram mode badge ──────────────────────────────────────────────────── */
+
+.tg-mode-badge {
+  font-size: 0.72rem;
+  padding: 0.22rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(36, 161, 222, 0.12);
+  border: 1px solid rgba(36, 161, 222, 0.35);
+  color: #24a1de;
+  letter-spacing: 0.02em;
+}
+
 /* ─── Reconnecting overlay ─────────────────────────────────────────────────── */
 
 .reconnecting-overlay {

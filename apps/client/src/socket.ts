@@ -1,10 +1,19 @@
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import type { ServerToClientEvents, ClientToServerEvents } from '@rozpisnyi-poker/shared';
+import { getTelegramUser, telegramPlayerId } from './telegram.ts';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:3001';
 
 function getOrCreatePlayerId(): string {
+  // Inside Telegram: derive a stable ID from the Telegram user ID so the same
+  // person is always the same player regardless of device/session.
+  const tgUser = getTelegramUser();
+  if (tgUser) {
+    return telegramPlayerId(tgUser.id);
+  }
+
+  // Normal browser: persist a random UUID across refreshes.
   const key = 'poker:playerId';
   let id = localStorage.getItem(key);
   if (!id) {

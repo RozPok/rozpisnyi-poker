@@ -1,8 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Card, GameRoom } from '@rozpisnyi-poker/shared';
 import { socket, myPlayerId, saveSession, loadSession, clearSession } from './socket.ts';
+import { initTelegram, isTelegram, getTelegramUser } from './telegram.ts';
 import Home from './pages/Home.tsx';
 import Lobby from './pages/Lobby.tsx';
+
+// Resolved once at module load — window.Telegram is synchronously available
+// because the script tag in index.html has no defer/async attribute.
+const tgMode = isTelegram();
+const tgUser = getTelegramUser();
+const tgPlayerName = tgUser
+  ? (tgUser.first_name || tgUser.username || '')
+  : undefined;
 
 type Page = 'home' | 'lobby' | 'restoring';
 
@@ -34,6 +43,7 @@ export default function App() {
   }, [page]);
 
   useEffect(() => {
+    initTelegram(); // no-op outside Telegram
     socket.connect();
 
     socket.on('connect', () => {
@@ -129,5 +139,12 @@ export default function App() {
     );
   }
 
-  return <Home onRoomJoined={handleRoomJoined} restoreError={restoreError} />;
+  return (
+    <Home
+      onRoomJoined={handleRoomJoined}
+      restoreError={restoreError}
+      tgPlayerName={tgPlayerName}
+      isTgMode={tgMode}
+    />
+  );
 }
