@@ -14,9 +14,10 @@ describe('createDeck', () => {
     expect(createDeck()).toHaveLength(33);
   });
 
-  it('spades has 9 cards (6 through A)', () => {
+  it('spades has 8 cards (7 through A, no 6)', () => {
     const spades = createDeck().filter(c => c.suit === 'spades');
-    expect(spades).toHaveLength(9);
+    expect(spades).toHaveLength(8);
+    expect(spades.every(c => c.rank !== '6')).toBe(true);
   });
 
   it('hearts, diamonds, clubs each have 8 cards (7 through A)', () => {
@@ -35,10 +36,10 @@ describe('createDeck', () => {
     expect(createDeck().filter(c => c.isJoker)).toHaveLength(1);
   });
 
-  it('Joker is the 6 of spades', () => {
+  it('Joker has suit "joker" and rank "joker"', () => {
     const joker = createDeck().find(c => c.isJoker)!;
-    expect(joker.suit).toBe('spades');
-    expect(joker.rank).toBe('6');
+    expect(joker.suit).toBe('joker');
+    expect(joker.rank).toBe('joker');
   });
 
   it('Joker label is "Жопа"', () => {

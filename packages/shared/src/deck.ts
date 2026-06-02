@@ -2,12 +2,12 @@ import type { Card, Rank, Suit } from './types.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SPADES_RANKS: Rank[] = ['6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']; // 9 cards
-const OTHER_RANKS: Rank[] = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A'];        // 8 cards each
+const SPADES_RANKS: Rank[] = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A']; // 8 cards (no 6)
+const OTHER_RANKS: Rank[] = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A']; // 8 cards each
 const SUITS: Suit[] = ['spades', 'hearts', 'diamonds', 'clubs'];
 
-const JOKER_SUIT: Suit = 'spades';
-const JOKER_RANK: Rank = '6';
+const JOKER_SUIT: Suit = 'joker';
+const JOKER_RANK: Rank = 'joker';
 const JOKER_LABEL = 'Жопа';
 
 const EXPECTED_DECK_SIZE = 33;
@@ -20,6 +20,7 @@ function suitLabel(suit: Suit): string {
     case 'hearts':   return '♥';
     case 'diamonds': return '♦';
     case 'clubs':    return '♣';
+    case 'joker':    return '';
   }
 }
 
@@ -39,7 +40,7 @@ function makeCard(suit: Suit, rank: Rank): Card {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-/** Returns an ordered (un-shuffled) 33-card deck. */
+/** Returns an ordered (un-shuffled) 33-card deck: 32 normal cards + 1 dedicated Joker. */
 export function createDeck(): Card[] {
   const deck: Card[] = [];
 
@@ -50,6 +51,8 @@ export function createDeck(): Card[] {
     }
   }
 
+  // Dedicated Joker card — always last in the unshuffled deck (index 32)
+  deck.push(makeCard(JOKER_SUIT, JOKER_RANK));
   return deck;
 }
 

@@ -16,6 +16,7 @@ export const TRUMP_SUIT_LABELS: Record<Suit, string> = {
   hearts:   'Чирва ♥',
   diamonds: 'Буба ♦',
   clubs:    'Хреста ♣',
+  joker:    '',          // unreachable: determineTrump() returns null for the Joker card
 };
 
 // ─── Generator ────────────────────────────────────────────────────────────────

@@ -1,8 +1,8 @@
 // ─── Primitives ──────────────────────────────────────────────────────────────
 
-export type Suit = 'spades' | 'hearts' | 'diamonds' | 'clubs';
+export type Suit = 'spades' | 'hearts' | 'diamonds' | 'clubs' | 'joker';
 
-export type Rank = '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
+export type Rank = '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A' | 'joker';
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
 

@@ -382,7 +382,7 @@ describe('playCard', () => {
 
   it('removes played card from hand', () => {
     const hand = getHand(room.id, 'p1')!;
-    const cardToPlay = hand[0]!;
+    const cardToPlay = hand.find(c => !c.isJoker) ?? hand[0]!;
     const sizeBefore = hand.length;
     playCard(room, 'p1', cardToPlay);
     expect(getHand(room.id, 'p1')!.length).toBe(sizeBefore - 1);
@@ -622,7 +622,7 @@ describe('finishRound — round progression', () => {
 
 // ─── Joker integration ────────────────────────────────────────────────────────
 
-const JOKER_CARD = { suit: 'spades' as const, rank: '6' as const, isJoker: true, label: 'Жопа' };
+const JOKER_CARD = { suit: 'joker' as const, rank: 'joker' as const, isJoker: true, label: 'Жопа' };
 
 describe('playCard — Joker wins trick', () => {
   it('player who plays Joker wins the trick', () => {
@@ -762,11 +762,15 @@ describe('playCard — non-leading Joker modes', () => {
     const ar = room.activeRound!;
     ar.phase = 'playing';
     ar.bids = { p1: 1, p2: 1, p3: 0 };
+    // Fix trump to hearts so trick-winner tests are deterministic regardless of deal
+    ar.trumpSuit = 'hearts';
     const h1 = getHand(room.id, 'p1')!;
     const h2 = getHand(room.id, 'p2')!;
-    // p1 leads with a spades card; p2 has the Joker
+    const h3 = getHand(room.id, 'p3')!;
+    // p1 leads with spades ace; p2 has the Joker; p3 has only clubs (no spades/hearts)
     h1[0] = { suit: 'spades', rank: 'A', isJoker: false, label: 'A♠' };
     h2[0] = JOKER_CARD;
+    for (let i = 0; i < h3.length; i++) h3[i] = { suit: 'clubs', rank: '7', isJoker: false, label: '7♣' };
     return { room, ar, h1, h2 };
   }
 
@@ -1056,11 +1060,16 @@ describe('dealRound — round starter rotation', () => {
     const ar = room.activeRound!;
     ar.phase = 'playing';
     ar.bids = { p1: 1, p2: 1, p3: 0 };
+    // Pin trump to hearts so p3 cannot play an off-suit trump that beats A♥
+    ar.trumpSuit = 'hearts';
 
     const h1 = getHand(room.id, 'p1')!;
     const h2 = getHand(room.id, 'p2')!;
-    h1[0] = { suit: 'hearts', rank: '6',  isJoker: false, label: '6♥' };
-    h2[0] = { suit: 'hearts', rank: 'A',  isJoker: false, label: 'A♥' };
+    const h3 = getHand(room.id, 'p3')!;
+    h1[0] = { suit: 'hearts', rank: '6', isJoker: false, label: '6♥' };
+    h2[0] = { suit: 'hearts', rank: 'A', isJoker: false, label: 'A♥' };
+    // Give p3 only clubs so they have no hearts (lead/trump) and cannot beat A♥
+    for (let i = 0; i < h3.length; i++) h3[i] = { suit: 'clubs', rank: '7', isJoker: false, label: '7♣' };
 
     playCard(room, 'p1', h1[0]!);  // p1 leads low hearts
     playCard(room, 'p2', h2[0]!);  // p2 plays A♥ — wins
