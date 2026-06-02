@@ -207,3 +207,91 @@ describe('canPlayCard', () => {
     expect(canPlayCard(hand, card('spades', '7'), null, 'spades')).toBe(true);
   });
 });
+
+// ─── Joker declaration modes ──────────────────────────────────────────────────
+
+describe('getLegalCards — highest-suit declaration', () => {
+  it('forces the highest card of declared suit', () => {
+    // hand: A♥ K♥ 7♠ Q♣ — declared hearts → only A♥ (highest) is legal
+    const legal = getLegalCards(mixedHand, 'hearts', 'spades', { mode: 'highest-suit', suit: 'hearts' });
+    expect(legal).toEqual([card('hearts', 'A')]);
+  });
+
+  it('forces correct highest when multiple declared-suit cards present', () => {
+    const hand = [card('hearts', '7'), card('hearts', 'K'), card('hearts', 'Q'), card('clubs', 'A')];
+    const legal = getLegalCards(hand, null, null, { mode: 'highest-suit', suit: 'hearts' });
+    expect(legal).toHaveLength(1);
+    expect(legal[0]).toEqual(card('hearts', 'K'));
+  });
+
+  it('allows any card when player lacks the declared suit', () => {
+    const hand = [card('clubs', 'Q'), card('diamonds', 'J')];
+    const legal = getLegalCards(hand, null, null, { mode: 'highest-suit', suit: 'hearts' });
+    expect(legal).toHaveLength(2);
+  });
+
+  it('includes joker alongside highest declared-suit card', () => {
+    const hand = [card('hearts', 'K'), card('hearts', '7'), joker];
+    const legal = getLegalCards(hand, null, null, { mode: 'highest-suit', suit: 'hearts' });
+    expect(legal).toContainEqual(joker);
+    expect(legal).toContainEqual(card('hearts', 'K'));
+    expect(legal).not.toContainEqual(card('hearts', '7'));
+    expect(legal).toHaveLength(2);
+  });
+});
+
+describe('getLegalCards — lowest-suit declaration', () => {
+  it('forces the lowest card of declared suit', () => {
+    // hand: A♥ K♥ 7♠ Q♣ — declared hearts → only K♥ is the only heart... wait.
+    // Actually declared hearts from mixedHand: A♥ K♥. Lowest = K♥.
+    const legal = getLegalCards(mixedHand, 'hearts', 'spades', { mode: 'lowest-suit', suit: 'hearts' });
+    expect(legal).toEqual([card('hearts', 'K')]);
+  });
+
+  it('forces correct lowest when multiple declared-suit cards present', () => {
+    const hand = [card('hearts', '7'), card('hearts', 'K'), card('hearts', 'Q'), card('clubs', 'A')];
+    const legal = getLegalCards(hand, null, null, { mode: 'lowest-suit', suit: 'hearts' });
+    expect(legal).toHaveLength(1);
+    expect(legal[0]).toEqual(card('hearts', '7'));
+  });
+
+  it('allows any card when player lacks the declared suit', () => {
+    const hand = [card('clubs', 'Q'), card('diamonds', 'J')];
+    const legal = getLegalCards(hand, null, null, { mode: 'lowest-suit', suit: 'hearts' });
+    expect(legal).toHaveLength(2);
+  });
+
+  it('includes joker alongside lowest declared-suit card', () => {
+    const hand = [card('hearts', 'K'), card('hearts', '7'), joker];
+    const legal = getLegalCards(hand, null, null, { mode: 'lowest-suit', suit: 'hearts' });
+    expect(legal).toContainEqual(joker);
+    expect(legal).toContainEqual(card('hearts', '7'));
+    expect(legal).not.toContainEqual(card('hearts', 'K'));
+    expect(legal).toHaveLength(2);
+  });
+});
+
+describe('getLegalCards — lay-down declaration', () => {
+  it('any card is legal before first non-Joker (leadSuit=null)', () => {
+    const hand = [card('spades', 'K'), card('clubs', '9'), joker];
+    const legal = getLegalCards(hand, null, null, { mode: 'lay-down' });
+    expect(legal).toHaveLength(3);
+  });
+
+  it('normal suit-following rules apply once leadSuit is set', () => {
+    // Effective lead: spades (first non-Joker set it)
+    const hand = [card('spades', 'A'), card('clubs', '9'), joker];
+    const legal = getLegalCards(hand, 'spades', null, { mode: 'lay-down' });
+    // Has spades → must follow
+    expect(legal).toContainEqual(card('spades', 'A'));
+    expect(legal).toContainEqual(joker);
+    expect(legal).not.toContainEqual(card('clubs', '9'));
+  });
+
+  it('any card when no lead suit and no trump in lay-down (no-trump round)', () => {
+    const hand = [card('clubs', '8'), card('diamonds', 'J')];
+    const legal = getLegalCards(hand, 'hearts', null, { mode: 'lay-down' });
+    // No hearts, no trump → any card
+    expect(legal).toHaveLength(2);
+  });
+});

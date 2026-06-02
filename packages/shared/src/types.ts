@@ -118,6 +118,7 @@ export interface ActiveRound {
   currentTrick: TrickPlay[];            // cards played so far in this trick
   leadSuit: Suit | null;               // suit of the first card played (null = not started)
   trumpSuit: Suit | null;              // trump for this round (null = no-trump or not yet set)
+  jokerDeclaration: JokerDeclaration | null; // set when Joker leads a trick
   currentTurnPlayerId: string;         // who must play next (bidding or playing)
   trickLeadPlayerId: string;           // who leads the first trick
   tricksWon: Record<string, number>;   // playerId → tricks won this round
@@ -132,6 +133,19 @@ export type PlayResult =
 export type BidResult =
   | { ok: true }
   | { ok: false; error: string };
+
+// ─── Joker declaration ────────────────────────────────────────────────────────
+
+/**
+ * Declared mode when a player leads a trick with the Joker.
+ *
+ * highest-suit / lowest-suit: requires `suit`.
+ * lay-down: no suit; next non-Joker card becomes the effective lead.
+ */
+export interface JokerDeclaration {
+  mode: 'highest-suit' | 'lowest-suit' | 'lay-down';
+  suit?: Suit;
+}
 
 // ─── Room / Lobby ─────────────────────────────────────────────────────────────
 
@@ -190,5 +204,9 @@ export interface ClientToServerEvents {
   'room:leave': (callback: () => void) => void;
   'game:start': (callback: (result: RoomResult) => void) => void;
   'bid:submit': (tricks: number, callback: (result: BidResult) => void) => void;
-  'card:play': (card: Card, callback: (result: PlayResult) => void) => void;
+  'card:play': (
+    card: Card,
+    declaration: JokerDeclaration | null,
+    callback: (result: PlayResult) => void,
+  ) => void;
 }

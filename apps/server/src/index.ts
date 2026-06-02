@@ -141,13 +141,13 @@ io.on('connection', socket => {
   });
 
   // ── card:play ───────────────────────────────────────────────────────────────
-  socket.on('card:play', (card, callback) => {
+  socket.on('card:play', (card, declaration, callback) => {
     const room = rooms.getRoomByPlayerId(socket.id);
     if (!room) {
       callback({ ok: false, error: 'Кімнату не знайдено' });
       return;
     }
-    const result = game.playCard(room, socket.id, card);
+    const result = game.playCard(room, socket.id, card, declaration);
     if (!result.ok) {
       callback(result);
       return;

@@ -85,14 +85,21 @@ function makeRoomAtRound(
 
 /**
  * Plays the first *legal* card for `playerId` according to the current trick
- * state. Throws if no legal card is found (shouldn't happen with a valid hand).
+ * state (including any active Joker declaration). Throws if no legal card
+ * is found or the play is rejected.
  */
 function playLegalCard(room: GameRoom, playerId: string): void {
   const ar = room.activeRound!;
   const hand = getHand(room.id, playerId)!;
-  const legal = getLegalCards(hand, ar.leadSuit, ar.trumpSuit);
+  const legal = getLegalCards(hand, ar.leadSuit, ar.trumpSuit, ar.jokerDeclaration ?? undefined);
   if (legal.length === 0) throw new Error(`No legal card for ${playerId}`);
-  const result = playCard(room, playerId, legal[0]!);
+  const card = legal[0]!;
+  // Joker leading a trick requires a declaration; default to lay-down
+  const declaration =
+    card.isJoker && ar.currentTrick.length === 0
+      ? { mode: 'lay-down' as const }
+      : null;
+  const result = playCard(room, playerId, card, declaration);
   if (!result.ok) throw new Error(`playLegalCard failed: ${result.error}`);
 }
 
@@ -322,7 +329,9 @@ describe('playCard', () => {
 
   it('accepts playing a card from hand', () => {
     const hand = getHand(room.id, 'p1')!;
-    expect(playCard(room, 'p1', hand[0]!)).toEqual({ ok: true });
+    // Use a non-Joker card: leading with the Joker would require a declaration
+    const card = hand.find(c => !c.isJoker) ?? hand[0]!;
+    expect(playCard(room, 'p1', card)).toEqual({ ok: true });
   });
 
   it('removes played card from hand', () => {
@@ -335,13 +344,14 @@ describe('playCard', () => {
 
   it('decrements playerCardCounts', () => {
     const hand = getHand(room.id, 'p1')!;
-    playCard(room, 'p1', hand[0]!);
+    const card = hand.find(c => !c.isJoker) ?? hand[0]!;
+    playCard(room, 'p1', card);
     expect(room.activeRound!.playerCardCounts['p1']).toBe(2);
   });
 
   it('adds play to currentTrick', () => {
     const hand = getHand(room.id, 'p1')!;
-    const card = hand[0]!;
+    const card = hand.find(c => !c.isJoker) ?? hand[0]!;
     playCard(room, 'p1', card);
     expect(room.activeRound!.currentTrick).toHaveLength(1);
     expect(room.activeRound!.currentTrick[0]!.card).toEqual(card);
@@ -349,7 +359,8 @@ describe('playCard', () => {
 
   it('advances turn to next player', () => {
     const hand = getHand(room.id, 'p1')!;
-    playCard(room, 'p1', hand[0]!);
+    const card = hand.find(c => !c.isJoker) ?? hand[0]!;
+    playCard(room, 'p1', card);
     expect(room.activeRound!.currentTurnPlayerId).toBe('p2');
   });
 
@@ -575,7 +586,7 @@ describe('playCard — Joker wins trick', () => {
     const h1 = getHand(room.id, 'p1')!;
     h1[0] = JOKER_CARD;
 
-    playCard(room, 'p1', JOKER_CARD); // Joker leads
+    playCard(room, 'p1', JOKER_CARD, { mode: 'highest-suit', suit: 'hearts' });
     playLegalCard(room, 'p2');
     playLegalCard(room, 'p3');
 
@@ -606,6 +617,28 @@ describe('playCard — Joker wins trick', () => {
     expect(ar.tricksWon['p1']).toBe(0);
   });
 
+  it('requires declaration when Joker leads a trick', () => {
+    const room = makeRoomWithScores(3, 3, 'normal');
+    const ar = room.activeRound!;
+    ar.phase = 'playing';
+    ar.bids = { p1: 1, p2: 1, p3: 0 };
+    const h1 = getHand(room.id, 'p1')!;
+    h1[0] = JOKER_CARD;
+    const result = playCard(room, 'p1', JOKER_CARD); // no declaration
+    expect(result).toEqual({ ok: false, error: expect.any(String) });
+  });
+
+  it('rejects highest/lowest-suit declaration without a suit', () => {
+    const room = makeRoomWithScores(3, 3, 'normal');
+    const ar = room.activeRound!;
+    ar.phase = 'playing';
+    ar.bids = { p1: 1, p2: 1, p3: 0 };
+    const h1 = getHand(room.id, 'p1')!;
+    h1[0] = JOKER_CARD;
+    const result = playCard(room, 'p1', JOKER_CARD, { mode: 'highest-suit' });
+    expect(result).toEqual({ ok: false, error: expect.any(String) });
+  });
+
   it('first Joker beats second Joker', () => {
     const room = makeRoomWithScores(3, 3, 'normal');
     const ar = room.activeRound!;
@@ -618,11 +651,160 @@ describe('playCard — Joker wins trick', () => {
     h1[0] = JOKER_CARD;
     h2[0] = { ...JOKER_CARD }; // second Joker (copy so !== same ref)
 
-    playCard(room, 'p1', h1[0]!); // first Joker
-    playCard(room, 'p2', h2[0]!); // second Joker — must NOT win
+    // highest-suit: p1 (Joker declarant) wins unconditionally regardless of other Jokers
+    playCard(room, 'p1', h1[0]!, { mode: 'highest-suit', suit: 'hearts' });
+    playCard(room, 'p2', h2[0]!); // second Joker — Jokers are always legal, but p1 wins
     playLegalCard(room, 'p3');
 
-    expect(ar.tricksWon['p1']).toBe(1); // first Joker wins
+    expect(ar.tricksWon['p1']).toBe(1); // first Joker (declarant) wins
     expect(ar.tricksWon['p2']).toBe(0);
+  });
+});
+
+// ─── Joker declaration mode integration ──────────────────────────────────────
+
+function makePlayingRoom() {
+  const room = makeRoomWithScores(3, 5, 'normal');
+  const ar = room.activeRound!;
+  ar.phase = 'playing';
+  ar.bids = { p1: 2, p2: 1, p3: 0 };
+  return room;
+}
+
+describe('Joker declaration — highest-suit', () => {
+  it('Joker player wins the trick', () => {
+    const room = makePlayingRoom();
+    const ar = room.activeRound!;
+    const h1 = getHand(room.id, 'p1')!;
+    h1[0] = JOKER_CARD;
+
+    // p1 leads with Joker declaring highest hearts
+    playCard(room, 'p1', JOKER_CARD, { mode: 'highest-suit', suit: 'hearts' });
+
+    // jokerDeclaration is stored; leadSuit = hearts
+    expect(ar.jokerDeclaration).toEqual({ mode: 'highest-suit', suit: 'hearts' });
+    expect(ar.leadSuit).toBe('hearts');
+
+    playLegalCard(room, 'p2');
+    playLegalCard(room, 'p3');
+
+    expect(ar.tricksWon['p1']).toBe(1);
+    expect(ar.tricksWon['p2']).toBe(0);
+    expect(ar.tricksWon['p3']).toBe(0);
+  });
+
+  it('jokerDeclaration is cleared after the trick completes', () => {
+    const room = makePlayingRoom();
+    const ar = room.activeRound!;
+    const h1 = getHand(room.id, 'p1')!;
+    h1[0] = JOKER_CARD;
+    playCard(room, 'p1', JOKER_CARD, { mode: 'highest-suit', suit: 'hearts' });
+    playLegalCard(room, 'p2');
+    playLegalCard(room, 'p3');
+    expect(ar.jokerDeclaration).toBeNull();
+  });
+
+  it('followers with the declared suit must play their highest card', () => {
+    const room = makePlayingRoom();
+    const ar = room.activeRound!;
+    const h1 = getHand(room.id, 'p1')!;
+    const h2 = getHand(room.id, 'p2')!;
+    h1[0] = JOKER_CARD;
+    // Give p2 two hearts; only the highest should be accepted
+    h2[0] = { suit: 'hearts', rank: 'K', isJoker: false, label: 'K♥' };
+    h2[1] = { suit: 'hearts', rank: '7', isJoker: false, label: '7♥' };
+
+    playCard(room, 'p1', JOKER_CARD, { mode: 'highest-suit', suit: 'hearts' });
+
+    // K♥ is the highest → legal; 7♥ is not
+    expect(playCard(room, 'p2', h2[1]!)).toEqual({ ok: false, error: expect.any(String) });
+    expect(playCard(room, 'p2', h2[0]!)).toEqual({ ok: true });
+  });
+});
+
+describe('Joker declaration — lowest-suit', () => {
+  it('the highest declared-suit card wins, not the Joker', () => {
+    const room = makePlayingRoom();
+    const ar = room.activeRound!;
+    const h1 = getHand(room.id, 'p1')!;
+    const h2 = getHand(room.id, 'p2')!;
+    const h3 = getHand(room.id, 'p3')!;
+    h1[0] = JOKER_CARD;
+    h2[0] = { suit: 'hearts', rank: 'A', isJoker: false, label: 'A♥' };
+    h3[0] = { suit: 'hearts', rank: 'K', isJoker: false, label: 'K♥' };
+    // Remove other hearts from h2/h3 to avoid multiple-option ambiguity
+    for (let i = 1; i < h2.length; i++) {
+      if (!h2[i]!.isJoker && h2[i]!.suit === 'hearts') h2[i] = { suit: 'clubs', rank: '8', isJoker: false, label: '8♣' };
+    }
+    for (let i = 1; i < h3.length; i++) {
+      if (!h3[i]!.isJoker && h3[i]!.suit === 'hearts') h3[i] = { suit: 'clubs', rank: '9', isJoker: false, label: '9♣' };
+    }
+
+    playCard(room, 'p1', JOKER_CARD, { mode: 'lowest-suit', suit: 'hearts' });
+    expect(ar.leadSuit).toBe('hearts');
+
+    playCard(room, 'p2', h2[0]!); // A♥
+    playCard(room, 'p3', h3[0]!); // K♥
+
+    expect(ar.tricksWon['p2']).toBe(1); // A♥ wins (highest hearts)
+    expect(ar.tricksWon['p1']).toBe(0); // Joker does not win
+  });
+
+  it('followers with the declared suit must play their lowest card', () => {
+    const room = makePlayingRoom();
+    const ar = room.activeRound!;
+    const h1 = getHand(room.id, 'p1')!;
+    const h2 = getHand(room.id, 'p2')!;
+    h1[0] = JOKER_CARD;
+    h2[0] = { suit: 'hearts', rank: 'A', isJoker: false, label: 'A♥' };
+    h2[1] = { suit: 'hearts', rank: '7', isJoker: false, label: '7♥' };
+
+    playCard(room, 'p1', JOKER_CARD, { mode: 'lowest-suit', suit: 'hearts' });
+
+    // A♥ is not the lowest → illegal; 7♥ is the lowest → legal
+    expect(playCard(room, 'p2', h2[0]!)).toEqual({ ok: false, error: expect.any(String) });
+    expect(playCard(room, 'p2', h2[1]!)).toEqual({ ok: true });
+  });
+});
+
+describe('Joker declaration — lay-down', () => {
+  it('first non-Joker sets effective lead suit', () => {
+    const room = makePlayingRoom();
+    const ar = room.activeRound!;
+    const h1 = getHand(room.id, 'p1')!;
+    h1[0] = JOKER_CARD;
+
+    playCard(room, 'p1', JOKER_CARD, { mode: 'lay-down' });
+    expect(ar.leadSuit).toBeNull(); // not yet set
+
+    const h2 = getHand(room.id, 'p2')!;
+    // Save the card BEFORE playing — splice removes it from the array
+    const p2Card = h2[0]!;
+    playCard(room, 'p2', p2Card); // first non-Joker establishes lead
+    expect(ar.leadSuit).toBe(p2Card.suit);
+  });
+
+  it('Joker does not win; normal trick winner among non-Joker cards', () => {
+    const room = makePlayingRoom();
+    const ar = room.activeRound!;
+    const h1 = getHand(room.id, 'p1')!;
+    const h2 = getHand(room.id, 'p2')!;
+    const h3 = getHand(room.id, 'p3')!;
+    h1[0] = JOKER_CARD;
+    // Set up controlled cards for p2/p3 to make a clear winner
+    const suit = h2[0]!.suit;
+    // Ensure p3 has a higher card of the same suit than p2
+    h3[0] = { suit, rank: 'A', isJoker: false, label: `A${suit}` };
+    // Make sure p2's card is not A
+    if (h2[0]!.rank === 'A') {
+      h2[0] = { suit, rank: 'K', isJoker: false, label: `K${suit}` };
+    }
+
+    playCard(room, 'p1', JOKER_CARD, { mode: 'lay-down' });
+    playCard(room, 'p2', h2[0]!);    // establishes leadSuit = suit
+    playCard(room, 'p3', h3[0]!);    // plays A of same suit → wins
+
+    expect(ar.tricksWon['p3']).toBe(1);
+    expect(ar.tricksWon['p1']).toBe(0); // Joker does not win
   });
 });

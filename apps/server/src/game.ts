@@ -1,4 +1,12 @@
-import type { ActiveRound, BidResult, Card, GameRoom, PlayResult, TrickPlay } from '@rozpisnyi-poker/shared';
+import type {
+  ActiveRound,
+  BidResult,
+  Card,
+  GameRoom,
+  JokerDeclaration,
+  PlayResult,
+  TrickPlay,
+} from '@rozpisnyi-poker/shared';
 import {
   canBidZero,
   canPlayCard,
@@ -52,6 +60,7 @@ export function dealRound(room: GameRoom): DealResult {
     currentTrick: [],
     leadSuit: null,
     trumpSuit: null,
+    jokerDeclaration: null,
     currentTurnPlayerId: firstPlayerId,
     trickLeadPlayerId: firstPlayerId,
     tricksWon: Object.fromEntries(room.players.map(p => [p.id, 0])),
@@ -183,6 +192,7 @@ export function playCard(
   room: GameRoom,
   playerId: string,
   card: Card,
+  declaration: JokerDeclaration | null = null,
 ): PlayResult {
   const ar = room.activeRound;
   if (!ar) return { ok: false, error: 'Раунд не активний' };
@@ -196,7 +206,22 @@ export function playCard(
   const cardIdx = hand.findIndex(c => c.suit === card.suit && c.rank === card.rank);
   if (cardIdx === -1) return { ok: false, error: 'Картку не знайдено в руці' };
 
-  if (!canPlayCard(hand, card, ar.leadSuit, ar.trumpSuit)) {
+  // When Joker leads a trick a declaration is required
+  if (ar.currentTrick.length === 0 && card.isJoker) {
+    if (!declaration) {
+      return { ok: false, error: 'Необхідно вибрати режим Джокера' };
+    }
+    if (
+      (declaration.mode === 'highest-suit' || declaration.mode === 'lowest-suit') &&
+      !declaration.suit
+    ) {
+      return { ok: false, error: 'Необхідно вказати масть для цього режиму' };
+    }
+  }
+
+  // Validate card legality using the declaration already stored for this trick
+  // (null for the Joker leader itself — any card is legal when leadSuit is null)
+  if (!canPlayCard(hand, card, ar.leadSuit, ar.trumpSuit, ar.jokerDeclaration ?? undefined)) {
     return { ok: false, error: 'Порушення правила ходу: потрібно відбити масть або козир' };
   }
 
@@ -205,8 +230,21 @@ export function playCard(
 
   hand.splice(cardIdx, 1);
 
+  // ── Set lead suit and Joker declaration ──────────────────────────────────────
   if (ar.currentTrick.length === 0) {
-    ar.leadSuit = card.isJoker ? null : card.suit;
+    if (card.isJoker && declaration) {
+      ar.jokerDeclaration = declaration;
+      // highest-suit / lowest-suit: declared suit is the effective lead
+      if (declaration.mode === 'highest-suit' || declaration.mode === 'lowest-suit') {
+        ar.leadSuit = declaration.suit!;
+      }
+      // lay-down: leadSuit stays null until first non-Joker is played
+    } else {
+      ar.leadSuit = card.suit;
+    }
+  } else if (ar.jokerDeclaration?.mode === 'lay-down' && ar.leadSuit === null && !card.isJoker) {
+    // First non-Joker in a lay-down trick establishes the effective lead suit
+    ar.leadSuit = card.suit;
   }
 
   const trickPlay: TrickPlay = { playerId, playerName: player.name, card };
@@ -216,11 +254,17 @@ export function playCard(
   const playerCount = room.players.length;
 
   if (ar.currentTrick.length === playerCount) {
-    const winnerId = determineTrickWinner(ar.currentTrick, ar.leadSuit, ar.trumpSuit);
+    const winnerId = determineTrickWinner(
+      ar.currentTrick,
+      ar.leadSuit,
+      ar.trumpSuit,
+      ar.jokerDeclaration ?? undefined,
+    );
     ar.tricksWon[winnerId] = (ar.tricksWon[winnerId] ?? 0) + 1;
     ar.currentTrickIndex++;
     ar.currentTrick = [];
     ar.leadSuit = null;
+    ar.jokerDeclaration = null;
     ar.trickLeadPlayerId = winnerId;
     ar.currentTurnPlayerId = winnerId;
 

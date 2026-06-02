@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { BidResult, Card, GameRoom, PlayResult } from '@rozpisnyi-poker/shared';
+import type { BidResult, Card, GameRoom, JokerDeclaration, PlayResult, Suit } from '@rozpisnyi-poker/shared';
 import { getLegalBids, getLegalCards } from '@rozpisnyi-poker/shared';
 import { socket } from '../socket.ts';
 
@@ -26,7 +26,6 @@ function BiddingPhase({ room, myId, hand }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Compute legal bids for the local player (used only when it's their turn)
   const playerScore = room.gameSheet?.scores.find(s => s.playerId === myId);
   const bidHistory: (number | null)[] = playerScore
     ? playerScore.bids.slice(0, ar.roundIndex)
@@ -66,7 +65,6 @@ function BiddingPhase({ room, myId, hand }: Props) {
         </div>
       </div>
 
-      {/* Per-player bid status */}
       <div className="bids-list">
         {room.players.map(p => {
           const hasBid = p.id in ar.bids;
@@ -90,7 +88,6 @@ function BiddingPhase({ room, myId, hand }: Props) {
         })}
       </div>
 
-      {/* Bid picker — only for the current bidder */}
       {isMyTurn && (
         <div className="bid-input-area">
           <p className="bid-prompt">
@@ -124,7 +121,6 @@ function BiddingPhase({ room, myId, hand }: Props) {
         </div>
       )}
 
-      {/* Read-only hand preview */}
       <div className="hand-area hand-area--preview">
         <p className="hand-label">Ваші карти ({hand.length})</p>
         <div className="hand-cards">
@@ -149,36 +145,48 @@ function BiddingPhase({ room, myId, hand }: Props) {
 
 // ─── Playing phase ────────────────────────────────────────────────────────────
 
+type JokerModalState =
+  | { step: 'mode'; card: Card }
+  | { step: 'suit'; card: Card; mode: 'highest-suit' | 'lowest-suit' };
+
 function PlayingPhase({ room, myId, hand }: Props) {
   const ar = room.activeRound!;
   const isMyTurn = ar.currentTurnPlayerId === myId;
   const currentPlayer = room.players.find(p => p.id === ar.currentTurnPlayerId);
+  const [jokerModal, setJokerModal] = useState<JokerModalState | null>(null);
 
   const legalCards = isMyTurn
-    ? getLegalCards(hand, ar.leadSuit, ar.trumpSuit)
+    ? getLegalCards(hand, ar.leadSuit, ar.trumpSuit, ar.jokerDeclaration ?? undefined)
     : [];
 
   function isLegal(card: Card): boolean {
     return legalCards.some(c => c.suit === card.suit && c.rank === card.rank);
   }
 
-  function handlePlayCard(card: Card) {
-    if (!isMyTurn || !isLegal(card)) return;
-    socket.emit('card:play', card, (result: PlayResult) => {
+  function emit(card: Card, declaration: JokerDeclaration | null) {
+    socket.emit('card:play', card, declaration, (result: PlayResult) => {
       if (!result.ok) console.error('[card:play]', result.error);
     });
+  }
+
+  function handleCardClick(card: Card) {
+    if (!isMyTurn || !isLegal(card)) return;
+    // Joker leading a trick → show declaration modal
+    if (card.isJoker && ar.currentTrick.length === 0) {
+      setJokerModal({ step: 'mode', card });
+      return;
+    }
+    emit(card, null);
   }
 
   const isRed = (card: Card) => card.suit === 'hearts' || card.suit === 'diamonds';
 
   return (
     <div className="game-table">
-      {/* Turn banner */}
       <div className={`turn-banner${isMyTurn ? ' turn-banner--mine' : ''}`}>
         {isMyTurn ? 'Ваш хід!' : `Хід: ${currentPlayer?.name ?? '…'}`}
       </div>
 
-      {/* Bids summary + tricks won */}
       <div className="tricks-tally">
         {room.players.map(p => (
           <span
@@ -192,7 +200,12 @@ function PlayingPhase({ room, myId, hand }: Props) {
         ))}
       </div>
 
-      {/* Current trick */}
+      {ar.jokerDeclaration && (
+        <div className="joker-declaration-banner">
+          Жопа: {jokerDeclarationLabel(ar.jokerDeclaration)}
+        </div>
+      )}
+
       <div className="trick-area">
         {ar.currentTrick.length === 0 ? (
           <p className="trick-empty">Стіл порожній</p>
@@ -217,7 +230,6 @@ function PlayingPhase({ room, myId, hand }: Props) {
         <div className="round-complete-banner">Раунд завершено!</div>
       )}
 
-      {/* Player's hand */}
       <div className="hand-area">
         <p className="hand-label">Ваші карти ({hand.length})</p>
         <div className="hand-cards">
@@ -233,7 +245,7 @@ function PlayingPhase({ room, myId, hand }: Props) {
                   card.isJoker ? 'hand-card--joker' : '',
                   isRed(card) ? 'hand-card--red' : '',
                 ].filter(Boolean).join(' ')}
-                onClick={() => handlePlayCard(card)}
+                onClick={() => handleCardClick(card)}
                 disabled={!playable}
                 title={
                   !isMyTurn
@@ -249,6 +261,107 @@ function PlayingPhase({ room, myId, hand }: Props) {
           })}
         </div>
       </div>
+
+      {/* Joker declaration modal */}
+      {jokerModal && (
+        <JokerModal
+          state={jokerModal}
+          onSelectMode={mode => {
+            if (mode === 'lay-down') {
+              emit(jokerModal.card, { mode: 'lay-down' });
+              setJokerModal(null);
+            } else {
+              setJokerModal({ step: 'suit', card: jokerModal.card, mode });
+            }
+          }}
+          onSelectSuit={suit => {
+            if (jokerModal.step === 'suit') {
+              emit(jokerModal.card, { mode: jokerModal.mode, suit });
+            }
+            setJokerModal(null);
+          }}
+          onBack={() => setJokerModal({ step: 'mode', card: jokerModal.card })}
+          onClose={() => setJokerModal(null)}
+        />
+      )}
     </div>
   );
+}
+
+// ─── Joker declaration modal ──────────────────────────────────────────────────
+
+const SUITS: { suit: Suit; label: string; red: boolean }[] = [
+  { suit: 'spades',   label: '♠ Піки',   red: false },
+  { suit: 'hearts',   label: '♥ Чирви',  red: true  },
+  { suit: 'diamonds', label: '♦ Буби',   red: true  },
+  { suit: 'clubs',    label: '♣ Хрести', red: false },
+];
+
+interface JokerModalProps {
+  state: JokerModalState;
+  onSelectMode: (mode: 'highest-suit' | 'lowest-suit' | 'lay-down') => void;
+  onSelectSuit: (suit: Suit) => void;
+  onBack: () => void;
+  onClose: () => void;
+}
+
+function JokerModal({ state, onSelectMode, onSelectSuit, onBack, onClose }: JokerModalProps) {
+  return (
+    <div className="joker-modal-overlay" onClick={onClose}>
+      <div className="joker-modal" onClick={e => e.stopPropagation()}>
+        <p className="joker-modal-title">Жопа — оберіть режим</p>
+
+        {state.step === 'mode' && (
+          <div className="joker-modal-options">
+            <button className="joker-mode-btn" onClick={() => onSelectMode('highest-suit')}>
+              <span className="jmb-name">Стара масть</span>
+              <span className="jmb-desc">Усі кладуть найстаршу картку масті</span>
+            </button>
+            <button className="joker-mode-btn" onClick={() => onSelectMode('lowest-suit')}>
+              <span className="jmb-name">Молодша масть</span>
+              <span className="jmb-desc">Усі кладуть наймолодшу картку масті</span>
+            </button>
+            <button className="joker-mode-btn" onClick={() => onSelectMode('lay-down')}>
+              <span className="jmb-name">Підкладання</span>
+              <span className="jmb-desc">Наступна не-Жопа визначає масть</span>
+            </button>
+          </div>
+        )}
+
+        {state.step === 'suit' && (
+          <>
+            <p className="joker-modal-sub">Оберіть масть</p>
+            <div className="joker-suit-options">
+              {SUITS.map(({ suit, label, red }) => (
+                <button
+                  key={suit}
+                  className={`joker-suit-btn${red ? ' joker-suit-btn--red' : ''}`}
+                  onClick={() => onSelectSuit(suit)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button className="joker-back-btn" onClick={onBack}>← Назад</button>
+          </>
+        )}
+
+        <button className="joker-close-btn" onClick={onClose}>✕</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function jokerDeclarationLabel(d: JokerDeclaration): string {
+  const suitNames: Record<string, string> = {
+    spades: 'піки', hearts: 'чирви', diamonds: 'буби', clubs: 'хрести',
+  };
+  const suit = d.suit ? ` — ${suitNames[d.suit] ?? d.suit}` : '';
+  switch (d.mode) {
+    case 'highest-suit': return `Стара масть${suit}`;
+    case 'lowest-suit':  return `Молодша масть${suit}`;
+    case 'lay-down':     return 'Підкладання';
+  }
 }
