@@ -9,7 +9,8 @@ import type { ClientToServerEvents, ServerToClientEvents } from '@rozpisnyi-poke
 import * as rooms from './rooms';
 import * as game from './game';
 
-const PORT = process.env.PORT ?? 3001;
+const PORT          = process.env.PORT ?? 3001;
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
 
 // ─── Express ──────────────────────────────────────────────────────────────────
 
@@ -25,7 +26,7 @@ app.get('/health', (_req, res) => {
 const httpServer = createServer(app);
 
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
-  cors: { origin: true, methods: ['GET', 'POST'] },
+  cors: { origin: CLIENT_ORIGIN, methods: ['GET', 'POST'] },
 });
 
 io.on('connection', socket => {
