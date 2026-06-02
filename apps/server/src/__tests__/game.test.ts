@@ -874,16 +874,17 @@ describe('Joker declaration — lay-down', () => {
     const room = makePlayingRoom();
     const ar = room.activeRound!;
     const h1 = getHand(room.id, 'p1')!;
+    const h2 = getHand(room.id, 'p2')!;
     h1[0] = JOKER_CARD;
+    // Inject a known non-Joker card so the test is not affected by random deal
+    h2[0] = { suit: 'clubs', rank: '8', isJoker: false, label: '8♣' };
 
     playCard(room, 'p1', JOKER_CARD, { mode: 'lay-down' });
     expect(ar.leadSuit).toBeNull(); // not yet set
 
-    const h2 = getHand(room.id, 'p2')!;
-    // Save the card BEFORE playing — splice removes it from the array
-    const p2Card = h2[0]!;
+    const p2Card = h2[0]!; // saved before splice
     playCard(room, 'p2', p2Card); // first non-Joker establishes lead
-    expect(ar.leadSuit).toBe(p2Card.suit);
+    expect(ar.leadSuit).toBe('clubs');
   });
 
   it('Joker does not win; normal trick winner among non-Joker cards', () => {
@@ -893,18 +894,13 @@ describe('Joker declaration — lay-down', () => {
     const h2 = getHand(room.id, 'p2')!;
     const h3 = getHand(room.id, 'p3')!;
     h1[0] = JOKER_CARD;
-    // Set up controlled cards for p2/p3 to make a clear winner
-    const suit = h2[0]!.suit;
-    // Ensure p3 has a higher card of the same suit than p2
-    h3[0] = { suit, rank: 'A', isJoker: false, label: `A${suit}` };
-    // Make sure p2's card is not A
-    if (h2[0]!.rank === 'A') {
-      h2[0] = { suit, rank: 'K', isJoker: false, label: `K${suit}` };
-    }
+    // Inject controlled cards so p2 establishes clubs as lead and p3's A♣ wins
+    h2[0] = { suit: 'clubs', rank: '7', isJoker: false, label: '7♣' };
+    h3[0] = { suit: 'clubs', rank: 'A', isJoker: false, label: 'A♣' };
 
     playCard(room, 'p1', JOKER_CARD, { mode: 'lay-down' });
-    playCard(room, 'p2', h2[0]!);    // establishes leadSuit = suit
-    playCard(room, 'p3', h3[0]!);    // plays A of same suit → wins
+    playCard(room, 'p2', h2[0]!);    // 7♣ establishes leadSuit = clubs
+    playCard(room, 'p3', h3[0]!);    // A♣ wins
 
     expect(ar.tricksWon['p3']).toBe(1);
     expect(ar.tricksWon['p1']).toBe(0); // Joker does not win

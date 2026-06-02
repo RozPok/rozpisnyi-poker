@@ -4,19 +4,22 @@ import { ROOM_MIN_PLAYERS, ROOM_MAX_PLAYERS, ROUND_TYPE_LABELS } from '@rozpisny
 import { socket } from '../socket.ts';
 import GameTable from '../components/GameTable.tsx';
 import ScoreBoard from '../components/ScoreBoard.tsx';
+import ScoreSheetModal from '../components/ScoreSheetModal.tsx';
 
 interface Props {
   room: GameRoom;
   myId: string;
   hand: Card[];
   onLeave: () => void;
+  onCardPlayed: (card: Card) => void;
 }
 
-export default function Lobby({ room, myId, hand, onLeave }: Props) {
-  const [copied, setCopied]         = useState(false);
-  const [isLeaving, setIsLeaving]   = useState(false);
-  const [isStarting, setIsStarting] = useState(false);
-  const [startError, setStartError] = useState('');
+export default function Lobby({ room, myId, hand, onLeave, onCardPlayed }: Props) {
+  const [copied, setCopied]             = useState(false);
+  const [isLeaving, setIsLeaving]       = useState(false);
+  const [isStarting, setIsStarting]     = useState(false);
+  const [startError, setStartError]     = useState('');
+  const [showScoreSheet, setShowScoreSheet] = useState(false);
 
   const isOwner = room.ownerId === myId;
 
@@ -110,11 +113,24 @@ export default function Lobby({ room, myId, hand, onLeave }: Props) {
               )}
             </div>
             <ScoreBoard gameSheet={gameSheet} players={room.players} myId={myId} compact />
-            <button className="btn btn-secondary" onClick={handleLeave} disabled={isLeaving}>
-              {isLeaving ? 'Виходимо…' : 'Вийти'}
-            </button>
+            <div className="game-header-actions">
+              <button className="btn-sheet" onClick={() => setShowScoreSheet(true)}>
+                Лист рахунку
+              </button>
+              <button className="btn btn-secondary" onClick={handleLeave} disabled={isLeaving}>
+                {isLeaving ? 'Виходимо…' : 'Вийти'}
+              </button>
+            </div>
           </div>
-          <GameTable room={room} myId={myId} hand={hand} />
+          <GameTable room={room} myId={myId} hand={hand} onCardPlayed={onCardPlayed} />
+          {showScoreSheet && (
+            <ScoreSheetModal
+              gameSheet={gameSheet}
+              players={room.players}
+              myId={myId}
+              onClose={() => setShowScoreSheet(false)}
+            />
+          )}
         </main>
       );
     }

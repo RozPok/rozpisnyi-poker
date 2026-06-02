@@ -47,8 +47,12 @@ export default function App() {
     });
   }
 
+  function handleCardPlayed(card: Card) {
+    setMyHand(prev => prev.filter(c => !(c.suit === card.suit && c.rank === card.rank)));
+  }
+
   if (page === 'lobby' && room) {
-    return <Lobby room={room} myId={myId} hand={myHand} onLeave={handleLeave} />;
+    return <Lobby room={room} myId={myId} hand={myHand} onLeave={handleLeave} onCardPlayed={handleCardPlayed} />;
   }
 
   return <Home onRoomJoined={handleRoomJoined} />;

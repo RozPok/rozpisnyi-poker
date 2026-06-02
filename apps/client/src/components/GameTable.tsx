@@ -7,14 +7,15 @@ interface Props {
   room: GameRoom;
   myId: string;
   hand: Card[];
+  onCardPlayed?: (card: Card) => void;
 }
 
-export default function GameTable({ room, myId, hand }: Props) {
+export default function GameTable({ room, myId, hand, onCardPlayed }: Props) {
   const ar = room.activeRound!;
 
   return ar.phase === 'bidding'
     ? <BiddingPhase room={room} myId={myId} hand={hand} />
-    : <PlayingPhase room={room} myId={myId} hand={hand} />;
+    : <PlayingPhase room={room} myId={myId} hand={hand} onCardPlayed={onCardPlayed} />;
 }
 
 // ─── Bidding phase ────────────────────────────────────────────────────────────
@@ -150,7 +151,7 @@ type JokerModalState =
   | { step: 'suit'; card: Card; mode: 'highest-suit' | 'lowest-suit' }   // leading — choose suit
   | { step: 'non-leading'; card: Card };                                  // non-leading — take / lay-down
 
-function PlayingPhase({ room, myId, hand }: Props) {
+function PlayingPhase({ room, myId, hand, onCardPlayed }: Props) {
   const ar = room.activeRound!;
   const isMyTurn = ar.currentTurnPlayerId === myId;
   const currentPlayer = room.players.find(p => p.id === ar.currentTurnPlayerId);
@@ -166,7 +167,11 @@ function PlayingPhase({ room, myId, hand }: Props) {
 
   function emit(card: Card, declaration: JokerDeclaration | null) {
     socket.emit('card:play', card, declaration, (result: PlayResult) => {
-      if (!result.ok) console.error('[card:play]', result.error);
+      if (!result.ok) {
+        console.error('[card:play]', result.error);
+      } else {
+        onCardPlayed?.(card);
+      }
     });
   }
 
