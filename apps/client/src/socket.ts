@@ -13,11 +13,13 @@ function getOrCreatePlayerId(): string {
     return telegramPlayerId(tgUser.id);
   }
 
-  // Normal browser: persist a random UUID across refreshes.
+  // Normal browser: persist a random ID across refreshes.
   const key = 'poker:playerId';
   let id = localStorage.getItem(key);
   if (!id) {
-    id = crypto.randomUUID();
+    id = typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `browser:${Date.now()}:${Math.random().toString(36).slice(2)}`;
     localStorage.setItem(key, id);
   }
   return id;
