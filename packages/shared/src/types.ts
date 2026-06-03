@@ -170,6 +170,12 @@ export interface RoomPlayer {
   id: string;          // socket ID
   name: string;
   isConnected: boolean;
+  /**
+   * True only when the player explicitly left during an active game.
+   * A temporarily-disconnected player (TCP drop / grace period) has
+   * isConnected=false but isVacant=false and cannot be replaced.
+   */
+  isVacant?: boolean;
 }
 
 /** A player during active gameplay — extends RoomPlayer with cards and score. */

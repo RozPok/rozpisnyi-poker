@@ -113,6 +113,78 @@ export function clearHands(roomId: string): void {
   handsByRoom.delete(roomId);
 }
 
+/**
+ * Transfer all game state from oldPlayerId to newPlayerId.
+ * Called when a new player takes over a vacant seat in an in-progress game.
+ * No-op when oldPlayerId === newPlayerId (reconnect to own seat).
+ */
+export function transferPlayerState(
+  roomId: string,
+  oldPlayerId: string,
+  newPlayerId: string,
+  newPlayerName: string,
+  room: GameRoom,
+): void {
+  if (oldPlayerId === newPlayerId) return;
+
+  // Transfer hand
+  const roomHands = handsByRoom.get(roomId);
+  if (roomHands) {
+    const hand = roomHands.get(oldPlayerId) ?? [];
+    roomHands.set(newPlayerId, hand);
+    roomHands.delete(oldPlayerId);
+  }
+
+  const ar = room.activeRound;
+  if (ar) {
+    if (oldPlayerId in ar.bids) {
+      ar.bids[newPlayerId] = ar.bids[oldPlayerId]!;
+      delete ar.bids[oldPlayerId];
+    }
+    if (oldPlayerId in ar.tricksWon) {
+      ar.tricksWon[newPlayerId] = ar.tricksWon[oldPlayerId]!;
+      delete ar.tricksWon[oldPlayerId];
+    }
+    if (oldPlayerId in ar.playerCardCounts) {
+      ar.playerCardCounts[newPlayerId] = ar.playerCardCounts[oldPlayerId]!;
+      delete ar.playerCardCounts[oldPlayerId];
+    }
+    if (oldPlayerId in ar.playerDarkFlags) {
+      ar.playerDarkFlags[newPlayerId] = ar.playerDarkFlags[oldPlayerId]!;
+      delete ar.playerDarkFlags[oldPlayerId];
+    }
+    if (ar.currentTurnPlayerId === oldPlayerId) ar.currentTurnPlayerId = newPlayerId;
+    if (ar.trickLeadPlayerId  === oldPlayerId) ar.trickLeadPlayerId  = newPlayerId;
+
+    ar.currentTrick = ar.currentTrick.map(play =>
+      play.playerId === oldPlayerId
+        ? { ...play, playerId: newPlayerId, playerName: newPlayerName }
+        : play,
+    );
+    if (ar.lastTrick) {
+      ar.lastTrick = {
+        ...ar.lastTrick,
+        winnerId: ar.lastTrick.winnerId === oldPlayerId ? newPlayerId : ar.lastTrick.winnerId,
+        plays: ar.lastTrick.plays.map(play =>
+          play.playerId === oldPlayerId
+            ? { ...play, playerId: newPlayerId, playerName: newPlayerName }
+            : play,
+        ),
+      };
+    }
+  }
+
+  if (room.gameSheet) {
+    const ps = room.gameSheet.scores.find(s => s.playerId === oldPlayerId);
+    if (ps) { ps.playerId = newPlayerId; ps.name = newPlayerName; }
+  }
+}
+
+/** Clear all stored hands. Only for use in tests. */
+export function _clearHandsForTest(): void {
+  handsByRoom.clear();
+}
+
 // ─── Scoring and round transition ─────────────────────────────────────────────
 
 export interface FinishRoundResult {

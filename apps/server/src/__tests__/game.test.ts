@@ -428,6 +428,18 @@ describe('playCard', () => {
     expect(room.activeRound!.currentTrickIndex).toBe(1);
   });
 
+  it('lastTrick includes all played cards and a winner after trick completes', () => {
+    playLegalCard(room, 'p1');
+    playLegalCard(room, 'p2');
+    playLegalCard(room, 'p3');
+    const last = room.activeRound!.lastTrick;
+    expect(last).not.toBeNull();
+    expect(last!.plays).toHaveLength(3);              // all 3 players' cards
+    expect(last!.plays.every(p => p.card !== undefined)).toBe(true);
+    expect(last!.winnerId).toMatch(/^p[123]$/);        // a valid player id
+    expect(last!.trickIndex).toBe(0);                  // first trick
+  });
+
   it('marks round complete when all cards played', () => {
     for (let t = 0; t < 3; t++) {
       const leader = room.activeRound!.currentTurnPlayerId;

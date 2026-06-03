@@ -16,6 +16,11 @@ const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
 // 10 minutes covers mobile browser suspension and Render free-tier cold starts.
 const DISCONNECT_GRACE_MS = 600_000;
 
+// How long (ms) to hold the completed-round state visible before calling finishRound.
+// Clients display the last trick for 3 s; the extra 200 ms ensures the server
+// advances only after every client's display window has closed.
+const TRICK_REVEAL_MS = 3_200;
+
 // ─── Express ──────────────────────────────────────────────────────────────────
 
 const app = express();
@@ -74,15 +79,48 @@ io.on('connection', socket => {
       callback({ ok: false, error: 'Заповніть всі поля' });
       return;
     }
+
+    // Try regular lobby join first (status === 'waiting')
     const result = rooms.joinRoom(trimmedCode, stableId, trimmedName);
-    if (typeof result === 'string') {
-      callback({ ok: false, error: result });
+    if (typeof result !== 'string') {
+      socket.join(result.id);
+      io.to(result.id).emit('room:updated', result);
+      console.log(`[room] "${trimmedName}" joined ${result.code}`);
+      callback({ ok: true, room: result });
       return;
     }
-    socket.join(result.id);
-    io.to(result.id).emit('room:updated', result);
-    console.log(`[room] "${trimmedName}" joined ${result.code}`);
-    callback({ ok: true, room: result });
+
+    // Regular join failed — if game is in-progress with a vacant seat, try a takeover
+    if (result === 'Гра вже розпочата') {
+      const inProgress = rooms.joinInProgressRoom(trimmedCode, stableId, trimmedName);
+      if (typeof inProgress === 'string') {
+        callback({ ok: false, error: inProgress });
+        return;
+      }
+
+      game.transferPlayerState(
+        inProgress.room.id,
+        inProgress.vacatedPlayerId,
+        stableId,
+        trimmedName,
+        inProgress.room,
+      );
+
+      socket.join(inProgress.room.id);
+      io.to(inProgress.room.id).emit('room:updated', inProgress.room);
+      callback({ ok: true, room: inProgress.room });
+
+      // Send current hand to the replacement player
+      const hand = game.getHand(inProgress.room.id, stableId) ?? [];
+      io.to(stableId).emit('hand:dealt', hand);
+
+      console.log(
+        `[room] "${trimmedName}" took vacant seat (was ${inProgress.vacatedPlayerId}) in ${trimmedCode}`,
+      );
+      return;
+    }
+
+    callback({ ok: false, error: result });
   });
 
   // ── room:leave ──────────────────────────────────────────────────────────────
@@ -199,13 +237,22 @@ io.on('connection', socket => {
     callback(result);
 
     if (room.activeRound?.isComplete) {
-      const { nextHandsMap } = game.finishRound(room);
+      // Broadcast the completed-round state first so every client can display
+      // the last trick for TRICK_REVEAL_MS before the next round begins.
+      // The room is in a valid (isComplete=true) state — no further card plays
+      // are accepted, so there is no race condition during the delay.
       io.to(room.id).emit('room:updated', room);
-      if (nextHandsMap) {
-        for (const player of room.players) {
-          io.to(player.id).emit('hand:dealt', nextHandsMap.get(player.id) ?? []);
+
+      setTimeout(() => {
+        if (!room.activeRound?.isComplete) return; // guard: already processed
+        const { nextHandsMap } = game.finishRound(room);
+        io.to(room.id).emit('room:updated', room);
+        if (nextHandsMap) {
+          for (const player of room.players) {
+            io.to(player.id).emit('hand:dealt', nextHandsMap.get(player.id) ?? []);
+          }
         }
-      }
+      }, TRICK_REVEAL_MS);
     } else {
       io.to(room.id).emit('room:updated', room);
     }

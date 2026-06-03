@@ -78,6 +78,21 @@ export function leaveRoom(playerId: string): { roomId: string; room: GameRoom | 
     return { roomId, room: null };
   }
 
+  // During an active game, vacate the seat rather than removing it so the
+  // slot can be reclaimed by the original player (room:reconnect) or taken
+  // by a new player (joinInProgressRoom / room:join).
+  if (room.status === 'in-progress') {
+    const player = room.players.find(p => p.id === playerId);
+    if (player) {
+      player.isConnected = false;
+      player.isVacant    = true;   // explicit leave — seat is now replaceable
+    }
+    // Remove mapping so original player must go through room:join or room:reconnect.
+    playerRoom.delete(playerId);
+    return { roomId, room };
+  }
+
+  // Waiting lobby or finished: remove player entirely.
   room.players = room.players.filter(p => p.id !== playerId);
   playerRoom.delete(playerId);
 
@@ -87,12 +102,60 @@ export function leaveRoom(playerId: string): { roomId: string; room: GameRoom | 
     return { roomId, room: null };
   }
 
-  // Transfer ownership when the owner leaves
   if (room.ownerId === playerId) {
     room.ownerId = room.players[0]!.id;
   }
 
   return { roomId, room };
+}
+
+/**
+ * Let a new player take over a vacant seat in an already-started game.
+ * Prefers a seat whose existing ID matches newPlayerId (same device reconnect).
+ * The caller must also invoke game.transferPlayerState() to migrate hand / round state.
+ * Returns the room and the old player ID whose seat was taken, or an error string.
+ */
+export function joinInProgressRoom(
+  code: string,
+  newPlayerId: string,
+  newPlayerName: string,
+): { room: GameRoom; vacatedPlayerId: string } | string {
+  const roomId = byCode.get(code.toUpperCase().trim());
+  if (!roomId) return 'Кімнату не знайдено';
+
+  const room = byId.get(roomId);
+  if (!room) return 'Кімнату не знайдено';
+  if (room.status !== 'in-progress') return 'Гра ще не почалась';
+
+  if (playerRoom.has(newPlayerId)) {
+    return playerRoom.get(newPlayerId) === roomId
+      ? 'Ви вже в цій кімнаті'
+      : 'Ви вже перебуваєте в кімнаті';
+  }
+
+  // Only seats explicitly vacated (isVacant=true) are replaceable.
+  // Temporarily-disconnected seats (TCP drop / grace period) have
+  // isConnected=false but isVacant=false and must NOT be replaced.
+  //
+  // Prefer the seat whose ID matches the joining player (same-device reconnect);
+  // fall back to any other vacant seat.
+  const vacantPlayer =
+    room.players.find(p => p.id === newPlayerId && p.isVacant === true) ??
+    room.players.find(p => p.isVacant === true);
+
+  if (!vacantPlayer) return 'Гра вже почалась і вільних місць немає';
+
+  const vacatedPlayerId = vacantPlayer.id;
+  cancelDisconnectTimer(vacatedPlayerId);
+  playerRoom.delete(vacatedPlayerId);
+
+  vacantPlayer.id          = newPlayerId;
+  vacantPlayer.name        = newPlayerName;
+  vacantPlayer.isConnected = true;
+  vacantPlayer.isVacant    = false;
+  playerRoom.set(newPlayerId, roomId);
+
+  return { room, vacatedPlayerId };
 }
 
 export function getRoomByPlayerId(playerId: string): GameRoom | undefined {
@@ -164,6 +227,7 @@ export function reconnectPlayer(
 
   cancelDisconnectTimer(playerId);
   player.isConnected = true;
+  player.isVacant    = false;  // reclaiming the seat — no longer replaceable
 
   // Ensure playerRoom mapping is intact (may have been cleared by an expired timer)
   playerRoom.set(playerId, roomId);
@@ -185,5 +249,5 @@ export function _reset(): void {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function makePlayer(id: string, name: string): RoomPlayer {
-  return { id, name, isConnected: true };
+  return { id, name, isConnected: true, isVacant: false };
 }

@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import type { Card, GameRoom, GameRound } from '@rozpisnyi-poker/shared';
-import { ROOM_MIN_PLAYERS, ROOM_MAX_PLAYERS, ROUND_TYPE_LABELS, TRUMP_SUIT_LABELS } from '@rozpisnyi-poker/shared';
+import { ROOM_MIN_PLAYERS, ROOM_MAX_PLAYERS, ROUND_TYPE_LABELS } from '@rozpisnyi-poker/shared';
 import { socket } from '../socket.ts';
-import GameTable from '../components/GameTable.tsx';
 import ScoreBoard from '../components/ScoreBoard.tsx';
-import ScoreSheetModal from '../components/ScoreSheetModal.tsx';
+import GameScreen from '../components/game/GameScreen.tsx';
 
 interface Props {
   room: GameRoom;
@@ -19,7 +18,6 @@ export default function Lobby({ room, myId, hand, onLeave, onCardPlayed }: Props
   const [isLeaving, setIsLeaving]       = useState(false);
   const [isStarting, setIsStarting]     = useState(false);
   const [startError, setStartError]     = useState('');
-  const [showScoreSheet, setShowScoreSheet] = useState(false);
 
   const isOwner = room.ownerId === myId;
 
@@ -92,56 +90,17 @@ export default function Lobby({ room, myId, hand, onLeave, onCardPlayed }: Props
       );
     }
 
-    // Active round: show game table + compact score board
+    // Active round: new full-screen game UI
     if (room.activeRound) {
-      const curRound = gameSheet.rounds[gameSheet.currentRoundIndex];
-      const trumpSuit = room.activeRound.trumpSuit;
-      const showTrump = !!trumpSuit && curRound?.type !== 'no-trump';
-      const trumpRed  = trumpSuit === 'hearts' || trumpSuit === 'diamonds';
       return (
-        <main className="screen game-screen">
-          <div className="game-header">
-            <h1 className="title">Розписний Покер</h1>
-            <div className="game-round-pill">
-              {curRound && (
-                <>
-                  <span className="grp-badge">{curRound.label}</span>
-                  {curRound.type === 'no-trump' ? (
-                    <span className="grp-type">Без козиря</span>
-                  ) : curRound.type !== 'normal' ? (
-                    <span className="grp-type">{ROUND_TYPE_LABELS[curRound.type]}</span>
-                  ) : null}
-                  {showTrump && (
-                    <span className={`grp-trump${trumpRed ? ' grp-trump--red' : ''}`}>
-                      {TRUMP_SUIT_LABELS[trumpSuit!]}
-                    </span>
-                  )}
-                  <span className="grp-meta">
-                    {gameSheet.currentRoundIndex + 1}/{gameSheet.rounds.length} · {curRound.cardsPerPlayer} карт
-                  </span>
-                </>
-              )}
-            </div>
-            <ScoreBoard gameSheet={gameSheet} players={room.players} myId={myId} compact />
-            <div className="game-header-actions">
-              <button className="btn-sheet" onClick={() => setShowScoreSheet(true)}>
-                Лист рахунку
-              </button>
-              <button className="btn btn-secondary" onClick={handleLeave} disabled={isLeaving}>
-                {isLeaving ? 'Виходимо…' : 'Вийти'}
-              </button>
-            </div>
-          </div>
-          <GameTable room={room} myId={myId} hand={hand} onCardPlayed={onCardPlayed} />
-          {showScoreSheet && (
-            <ScoreSheetModal
-              gameSheet={gameSheet}
-              players={room.players}
-              myId={myId}
-              onClose={() => setShowScoreSheet(false)}
-            />
-          )}
-        </main>
+        <GameScreen
+          room={room}
+          myId={myId}
+          hand={hand}
+          onCardPlayed={onCardPlayed}
+          onLeave={handleLeave}
+          isLeaving={isLeaving}
+        />
       );
     }
 
