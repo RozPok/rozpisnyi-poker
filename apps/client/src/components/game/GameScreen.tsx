@@ -9,6 +9,13 @@ import type {
 } from '@rozpisnyi-poker/shared';
 import { canRevealHand, getLegalCards, sortHand } from '@rozpisnyi-poker/shared';
 import { socket } from '../../socket.ts';
+import {
+  getHapticsEnabled,
+  setHapticsEnabled,
+  impactLight,
+  impactMedium,
+  impactHeavy,
+} from '../../telegramHaptics.ts';
 import TopBar       from './TopBar.tsx';
 import OpponentSeat from './OpponentSeat.tsx';
 import TableCenter  from './TableCenter.tsx';
@@ -46,6 +53,7 @@ export default function GameScreen({
   const [menuOpen,       setMenuOpen]       = useState(false);
   const [showScoreSheet, setShowScoreSheet] = useState(false);
   const [showLastTrick,  setShowLastTrick]  = useState(false);
+  const [hapticsOn,      setHapticsOn]      = useState(getHapticsEnabled);
 
   // Bidding: dark-choice lifted here so HandArea can compute visibility
   const [darkChoice, setDarkChoice] = useState<'dark' | 'not-dark' | null>(null);
@@ -87,6 +95,24 @@ export default function GameScreen({
     const t = setTimeout(() => setHiddenTrickIndex(effectiveTrickIndex), 3000);
     return () => clearTimeout(t);
   }, [effectiveTrickIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Haptic: trick won
+  const lastHapticTrickRef = useRef(effectiveTrickIndex);
+  useEffect(() => {
+    if (effectiveTrickIndex > lastHapticTrickRef.current) {
+      impactMedium();
+    }
+    lastHapticTrickRef.current = effectiveTrickIndex;
+  }, [effectiveTrickIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Haptic: round finished
+  const prevIsCompleteRef = useRef(ar.isComplete);
+  useEffect(() => {
+    if (ar.isComplete && !prevIsCompleteRef.current) {
+      impactHeavy();
+    }
+    prevIsCompleteRef.current = ar.isComplete;
+  }, [ar.isComplete]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Computed synchronously (no second render needed) — no flash.
   const showSnapshot =
@@ -131,7 +157,7 @@ export default function GameScreen({
   function emitCard(card: Card, declaration: JokerDeclaration | null) {
     socket.emit('card:play', card, declaration, (result: PlayResult) => {
       if (!result.ok) { console.error('[card:play]', result.error); }
-      else { onCardPlayed?.(card); }
+      else { impactMedium(); onCardPlayed?.(card); }
     });
   }
 
@@ -139,6 +165,7 @@ export default function GameScreen({
     if (!isMyTurn || ar.phase !== 'playing') return;
     if (showSnapshot) return; // wait for trick reveal to finish
     if (!isLegal(card)) return;
+    impactLight();
     if (card.isJoker) {
       setJokerModal(
         ar.currentTrick.length === 0
@@ -175,6 +202,16 @@ export default function GameScreen({
               onClick={() => { setMenuOpen(false); setShowScoreSheet(true); }}
             >
               Лист рахунку
+            </button>
+            <button
+              className="gs-menu-item"
+              onClick={() => {
+                const next = !hapticsOn;
+                setHapticsOn(next);
+                setHapticsEnabled(next);
+              }}
+            >
+              Вібрація: {hapticsOn ? 'Увімк.' : 'Вимк.'}
             </button>
             <button
               className="gs-menu-item gs-menu-item--danger"

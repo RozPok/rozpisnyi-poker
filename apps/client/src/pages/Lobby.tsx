@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Card, GameRoom, GameRound } from '@rozpisnyi-poker/shared';
 import { ROOM_MIN_PLAYERS, ROOM_MAX_PLAYERS, ROUND_TYPE_LABELS } from '@rozpisnyi-poker/shared';
 import { socket } from '../socket.ts';
 import ScoreBoard from '../components/ScoreBoard.tsx';
 import GameScreen from '../components/game/GameScreen.tsx';
+import { notificationSuccess } from '../telegramHaptics.ts';
 
 interface Props {
   room: GameRoom;
@@ -18,6 +19,14 @@ export default function Lobby({ room, myId, hand, onLeave, onCardPlayed }: Props
   const [isLeaving, setIsLeaving]       = useState(false);
   const [isStarting, setIsStarting]     = useState(false);
   const [startError, setStartError]     = useState('');
+
+  const prevStatusRef = useRef(room.status);
+  useEffect(() => {
+    if (room.status === 'finished' && prevStatusRef.current !== 'finished') {
+      notificationSuccess();
+    }
+    prevStatusRef.current = room.status;
+  }, [room.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isOwner = room.ownerId === myId;
 

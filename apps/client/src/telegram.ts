@@ -8,12 +8,19 @@ export interface TelegramUser {
   language_code?: string;
 }
 
+export interface TelegramHapticFeedback {
+  impactOccurred(style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'): void;
+  notificationOccurred(type: 'error' | 'success' | 'warning'): void;
+  selectionChanged(): void;
+}
+
 interface TelegramWebApp {
   ready(): void;
   expand(): void;
   initDataUnsafe: {
     user?: TelegramUser;
   };
+  HapticFeedback?: TelegramHapticFeedback;
 }
 
 declare global {

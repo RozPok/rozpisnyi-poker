@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ActiveRound, BidResult, GameRoom, GameRound } from '@rozpisnyi-poker/shared';
 import { getLegalBids } from '@rozpisnyi-poker/shared';
 import { socket } from '../../socket.ts';
+import { impactLight, selectionChanged } from '../../telegramHaptics.ts';
 
 interface Props {
   room: GameRoom;
@@ -45,6 +46,7 @@ export default function BidPanel({
 
   function handleBid() {
     if (!isMyTurn || submitting || selected === null) return;
+    impactLight();
     setSubmitting(true);
     setError('');
     const isDark = isDarkRound || darkChoice === 'dark';
@@ -120,7 +122,7 @@ export default function BidPanel({
               <button
                 key={v}
                 className={`bp-bid-btn${selected === v ? ' bp-bid-btn--selected' : ''}`}
-                onClick={() => setSelected(v)}
+                onClick={() => { selectionChanged(); setSelected(v); }}
               >
                 {v}
               </button>
