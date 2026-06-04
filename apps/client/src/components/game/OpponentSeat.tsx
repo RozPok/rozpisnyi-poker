@@ -5,9 +5,11 @@ interface Props {
   score: PlayerScore | undefined;
   ar: ActiveRound;
   isCurrentTurn: boolean;
+  /** Brief winner-glow pulse after collecting a trick */
+  isWinner?: boolean;
 }
 
-export default function OpponentSeat({ player, score, ar, isCurrentTurn }: Props) {
+export default function OpponentSeat({ player, score, ar, isCurrentTurn, isWinner = false }: Props) {
   const bid       = ar.bids[player.id];
   const tricks    = ar.tricksWon[player.id] ?? 0;
   const cardCount = ar.playerCardCounts[player.id] ?? 0;
@@ -30,8 +32,9 @@ export default function OpponentSeat({ player, score, ar, isCurrentTurn }: Props
     <div
       className={[
         'opp-seat',
-        isCurrentTurn      ? 'opp-seat--active'       : '',
+        isCurrentTurn       ? 'opp-seat--active'       : '',
         !player.isConnected ? 'opp-seat--disconnected' : '',
+        isWinner            ? 'opp-seat--winner'        : '',
       ].filter(Boolean).join(' ')}
     >
 

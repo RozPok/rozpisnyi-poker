@@ -12,6 +12,8 @@ interface Props {
   /** Lifted to parent so HandArea can compute card visibility */
   darkChoice: 'dark' | 'not-dark' | null;
   onSetDarkChoice: (v: 'dark' | 'not-dark' | null) => void;
+  /** True while the deal animation is running — all inputs are disabled */
+  isDealing?: boolean;
 }
 
 export default function BidPanel({
@@ -21,6 +23,7 @@ export default function BidPanel({
   ar,
   darkChoice,
   onSetDarkChoice,
+  isDealing = false,
 }: Props) {
   const [selected,   setSelected]   = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -101,12 +104,14 @@ export default function BidPanel({
         <div className="bp-dark-choice">
           <button
             className="bp-choice-btn bp-choice-btn--dark"
+            disabled={isDealing}
             onClick={() => onSetDarkChoice('dark')}
           >
             Темна
           </button>
           <button
             className="bp-choice-btn"
+            disabled={isDealing}
             onClick={() => onSetDarkChoice('not-dark')}
           >
             Відкрита
@@ -122,6 +127,7 @@ export default function BidPanel({
               <button
                 key={v}
                 className={`bp-bid-btn${selected === v ? ' bp-bid-btn--selected' : ''}`}
+                disabled={isDealing}
                 onClick={() => { selectionChanged(); setSelected(v); }}
               >
                 {v}
@@ -135,7 +141,7 @@ export default function BidPanel({
           <button
             className="bp-submit"
             onClick={handleBid}
-            disabled={submitting || selected === null}
+            disabled={isDealing || submitting || selected === null}
           >
             {submitting ? '…' : 'Підтвердити'}
           </button>

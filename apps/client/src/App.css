@@ -2671,3 +2671,236 @@ body {
 .gs-prev-trick-btn {
   touch-action: manipulation;
 }
+
+/* ── Deal Animation ──────────────────────────────────────────────────────── */
+
+@keyframes da-fly {
+  0%   { transform: translate(-50%, -50%) rotate(0deg) scale(1); opacity: 1; }
+  62%  { opacity: 1; }
+  100% {
+    transform: translate(calc(-50% + var(--da-x)), calc(-50% + var(--da-y)))
+               rotate(var(--da-r)) scale(0.8);
+    opacity: 0;
+  }
+}
+
+@keyframes da-overlay-fade {
+  0%, 76% { opacity: 1; }
+  100%     { opacity: 0; }
+}
+
+@keyframes da-deck-in {
+  from { transform: translate(-50%, -50%) scale(0.55); opacity: 0; }
+  to   { transform: translate(-50%, -50%) scale(1);    opacity: 1; }
+}
+
+.da-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: da-overlay-fade 1200ms ease-in forwards;
+}
+
+.da-stage {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+
+.da-deck {
+  position: absolute;
+  width: 46px;
+  height: 64px;
+  border-radius: 6px;
+  background: linear-gradient(145deg, #1c7eaf 0%, #0c3d5e 100%);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-shadow:
+    2px 2px 0 rgba(0, 0, 0, 0.45),
+    4px 4px 0 rgba(0, 0, 0, 0.3),
+    6px 6px 0 rgba(0, 0, 0, 0.18);
+  animation: da-deck-in 220ms ease-out forwards;
+}
+
+.da-deck::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.da-card {
+  position: absolute;
+  width: 38px;
+  height: 53px;
+  border-radius: 5px;
+  background: linear-gradient(145deg, #1c7eaf 0%, #0c3d5e 100%);
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 1px 2px 5px rgba(0, 0, 0, 0.45);
+  animation: da-fly 620ms ease-in forwards;
+  /* Start invisible until animationDelay fires */
+  opacity: 0;
+  animation-fill-mode: both;
+}
+
+.da-card::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 2px;
+}
+
+.da-label {
+  position: absolute;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgba(240, 234, 214, 0.92);
+  letter-spacing: 0.05em;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Gameplay animations ─────────────────────────────────────────────────── */
+
+/* 1 ── Card fly: hand → table center */
+
+.fly-card-overlay {
+  position: fixed;
+  z-index: 110;
+  pointer-events: none;
+  will-change: left, top;
+}
+
+/* 2 ── Trick collect: table center → winner direction */
+
+@keyframes collect-left {
+  from { transform: translate(0, 0) scale(1);    opacity: 1; }
+  to   { transform: translate(-48vw, -14vh) scale(0.3); opacity: 0; }
+}
+
+@keyframes collect-right {
+  from { transform: translate(0, 0) scale(1);    opacity: 1; }
+  to   { transform: translate(48vw,  -14vh) scale(0.3); opacity: 0; }
+}
+
+@keyframes collect-bottom {
+  from { transform: translate(0, 0) scale(1);    opacity: 1; }
+  to   { transform: translate(0, 28vh) scale(0.3); opacity: 0; }
+}
+
+.collect-card-overlay {
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.collect-card--left   { animation: collect-left   500ms ease-in both; }
+.collect-card--right  { animation: collect-right  500ms ease-in both; }
+.collect-card--bottom { animation: collect-bottom 500ms ease-in both; }
+
+/* 3 ── Hand reveal: cards slide up after dealing */
+
+@keyframes ha-card-reveal {
+  from { opacity: 0; transform: translateY(48px) rotate(6deg); }
+  to   { opacity: 1; transform: translateY(0)    rotate(0deg); }
+}
+
+.ha-card-wrap--revealing {
+  animation: ha-card-reveal 280ms calc(var(--ri, 0) * 55ms) both ease-out;
+}
+
+/* 4 ── Round result panel */
+
+@keyframes rr-appear {
+  from { opacity: 0; transform: scale(0.88) translateY(12px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+.gs-round-result {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(10, 36, 18, 0.92);
+  backdrop-filter: blur(4px);
+  animation: rr-appear 350ms ease-out both;
+  padding: 24px 20px;
+}
+
+.rr-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--gold);
+  text-align: center;
+}
+
+.rr-subtitle {
+  font-size: 0.85rem;
+  opacity: 0.65;
+  text-align: center;
+  margin-top: -6px;
+}
+
+.rr-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 6px;
+}
+
+.rr-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.rr-row--me   { border-color: rgba(201, 168, 76, 0.35); background: rgba(201, 168, 76, 0.08); }
+.rr-row--hit  { border-color: rgba(134, 239, 172, 0.4); }
+.rr-row--miss { opacity: 0.75; }
+
+.rr-name  { flex: 1; font-size: 0.88rem; }
+.rr-bid   { font-size: 0.88rem; font-family: 'Courier New', monospace; min-width: 40px; text-align: center; }
+.rr-total { font-size: 0.88rem; font-weight: 700; color: var(--gold); min-width: 36px; text-align: right; }
+
+/* 5 ── Winner seat pulse */
+
+@keyframes seat-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 168, 76, 0); }
+  45%       { box-shadow: 0 0 0 5px rgba(201, 168, 76, 0.55); }
+}
+
+.opp-seat--winner  { animation: seat-pulse 420ms ease-in-out 2; }
+.gs-me-bar--winner { animation: seat-pulse 420ms ease-in-out 2; border-radius: 8px; }
+
+/* prefers-reduced-motion: disable all gameplay animations */
+
+@media (prefers-reduced-motion: reduce) {
+  .fly-card-overlay,
+  .collect-card-overlay,
+  .ha-card-wrap--revealing,
+  .gs-round-result,
+  .opp-seat--winner,
+  .gs-me-bar--winner {
+    animation: none !important;
+    transition: none !important;
+  }
+  .collect-card-overlay { opacity: 0; }
+}

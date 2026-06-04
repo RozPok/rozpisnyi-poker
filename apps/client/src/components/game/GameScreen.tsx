@@ -1,11 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import type {
+  ActiveRound,
   Card,
   GameRoom,
+  GameSheet,
   JokerDeclaration,
   LastTrick,
   PlayResult,
   Suit,
+  TrickPlay,
 } from '@rozpisnyi-poker/shared';
 import { canRevealHand, getLegalCards, sortHand } from '@rozpisnyi-poker/shared';
 import { socket } from '../../socket.ts';
@@ -15,7 +18,11 @@ import {
   impactLight,
   impactMedium,
   impactHeavy,
+  notificationSuccess,
+  selectionChanged,
 } from '../../telegramHaptics.ts';
+import DealAnimation from './DealAnimation.tsx';
+import GraphicCard  from './GraphicCard.tsx';
 import TopBar       from './TopBar.tsx';
 import OpponentSeat from './OpponentSeat.tsx';
 import TableCenter  from './TableCenter.tsx';
@@ -29,6 +36,9 @@ type JokerModalState =
   | { step: 'mode';        card: Card }
   | { step: 'suit';        card: Card; mode: 'highest-suit' | 'lowest-suit' }
   | { step: 'non-leading'; card: Card };
+
+interface FlyingCard  { card: Card; from: DOMRect; to: DOMRect; }
+interface CollectState { plays: TrickPlay[]; direction: 'left' | 'right' | 'bottom'; from: DOMRect; }
 
 interface Props {
   room: GameRoom;
@@ -49,11 +59,23 @@ export default function GameScreen({
   onLeave,
   isLeaving,
 }: Props) {
+  const ar = room.activeRound!;
+  const gs = room.gameSheet!;
+
   // UI state
-  const [menuOpen,       setMenuOpen]       = useState(false);
-  const [showScoreSheet, setShowScoreSheet] = useState(false);
-  const [showLastTrick,  setShowLastTrick]  = useState(false);
-  const [hapticsOn,      setHapticsOn]      = useState(getHapticsEnabled);
+  const [menuOpen,        setMenuOpen]        = useState(false);
+  const [showScoreSheet,  setShowScoreSheet]  = useState(false);
+  const [showLastTrick,   setShowLastTrick]   = useState(false);
+  const [hapticsOn,       setHapticsOn]       = useState(getHapticsEnabled);
+  const [isDealing,       setIsDealing]       = useState(false);
+
+  // Animation state
+  const [flyingCard,      setFlyingCard]      = useState<FlyingCard | null>(null);
+  const [hiddenCard,      setHiddenCard]      = useState<Card | null>(null);
+  const [collectState,    setCollectState]    = useState<CollectState | null>(null);
+  const [winnerGlowId,    setWinnerGlowId]    = useState<string | null>(null);
+  const [isHandRevealing, setIsHandRevealing] = useState(false);
+  const [showRoundResult, setShowRoundResult] = useState(false);
 
   // Bidding: dark-choice lifted here so HandArea can compute visibility
   const [darkChoice, setDarkChoice] = useState<'dark' | 'not-dark' | null>(null);
@@ -61,8 +83,8 @@ export default function GameScreen({
   // Playing: Joker modal
   const [jokerModal, setJokerModal] = useState<JokerModalState | null>(null);
 
-  const ar = room.activeRound!;
-  const gs = room.gameSheet!;
+  // Ref to gs-table-zone — used to compute fly-card target and collect source
+  const tableCenterRef = useRef<HTMLDivElement>(null);
 
   // ── Trick snapshot (no-flash, covers last trick of round) ─────────────────
   //
@@ -90,29 +112,80 @@ export default function GameScreen({
   // Initialised to -1 so every new trick is shown immediately on first render.
   const [hiddenTrickIndex, setHiddenTrickIndex] = useState(-1);
 
+  // Trick snapshot timer + collect animation trigger
   useEffect(() => {
     if (effectiveTrickIndex < 0) { setHiddenTrickIndex(-1); return; }
-    const t = setTimeout(() => setHiddenTrickIndex(effectiveTrickIndex), 3000);
-    return () => clearTimeout(t);
-  }, [effectiveTrickIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Haptic: trick won
-  const lastHapticTrickRef = useRef(effectiveTrickIndex);
-  useEffect(() => {
-    if (effectiveTrickIndex > lastHapticTrickRef.current) {
+    // Start collect animation 600 ms before snapshot clears
+    const collectT = setTimeout(() => {
+      if (!effectiveLastTrick) return;
+      const from = tableCenterRef.current?.getBoundingClientRect() ?? new DOMRect();
+      const direction = getWinnerDirection(effectiveLastTrick.winnerId, myId, leftOpps, rightOpps);
+      setCollectState({ plays: effectiveLastTrick.plays, direction, from });
       impactMedium();
-    }
-    lastHapticTrickRef.current = effectiveTrickIndex;
+      setWinnerGlowId(effectiveLastTrick.winnerId);
+    }, 2400);
+
+    const hideT = setTimeout(() => setHiddenTrickIndex(effectiveTrickIndex), 3000);
+    return () => { clearTimeout(collectT); clearTimeout(hideT); };
   }, [effectiveTrickIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Haptic: round finished
+  // Clear winner glow after pulse
+  useEffect(() => {
+    if (!winnerGlowId) return;
+    const t = setTimeout(() => setWinnerGlowId(null), 800);
+    return () => clearTimeout(t);
+  }, [winnerGlowId]);
+
+  // Round result + haptic: round finished
   const prevIsCompleteRef = useRef(ar.isComplete);
   useEffect(() => {
     if (ar.isComplete && !prevIsCompleteRef.current) {
       impactHeavy();
+      notificationSuccess();
+      setShowRoundResult(true);
     }
     prevIsCompleteRef.current = ar.isComplete;
   }, [ar.isComplete]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Deal animation — fires on every new round (roundIndex change) and on mount.
+  // useLayoutEffect sets isDealing=true synchronously before first paint → no flash.
+  const lastAnimatedRoundIndexRef = useRef(-1);
+  useLayoutEffect(() => {
+    if (lastAnimatedRoundIndexRef.current === ar.roundIndex) return;
+    lastAnimatedRoundIndexRef.current = ar.roundIndex;
+    if (ar.phase !== 'bidding') return; // skip reconnect to mid-round (playing phase)
+    setIsDealing(true);
+    // Clear animation state from previous round
+    setShowRoundResult(false);
+    setCollectState(null);
+    setFlyingCard(null);
+    setHiddenCard(null);
+  }, [ar.roundIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Haptics + 1200 ms timer; keyed on both roundIndex and isDealing so the cleanup
+  // cancels the previous round's timer when a new round starts.
+  useEffect(() => {
+    if (!isDealing) return;
+    impactLight();
+    const t = setTimeout(() => {
+      setIsDealing(false);
+      selectionChanged();
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [ar.roundIndex, isDealing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Hand reveal — fires when deal animation ends, slides cards in one-by-one.
+  const wasDealing = useRef(false);
+  useEffect(() => {
+    if (isDealing) { wasDealing.current = true; return; }
+    if (!wasDealing.current) return;
+    wasDealing.current = false;
+    if (ar.phase !== 'bidding') return;
+    setIsHandRevealing(true);
+    const t = setTimeout(() => setIsHandRevealing(false), 700);
+    return () => clearTimeout(t);
+  }, [isDealing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Computed synchronously (no second render needed) — no flash.
   const showSnapshot =
@@ -156,15 +229,22 @@ export default function GameScreen({
 
   function emitCard(card: Card, declaration: JokerDeclaration | null) {
     socket.emit('card:play', card, declaration, (result: PlayResult) => {
-      if (!result.ok) { console.error('[card:play]', result.error); }
-      else { impactMedium(); onCardPlayed?.(card); }
+      if (!result.ok) {
+        console.error('[card:play]', result.error);
+        setHiddenCard(null); // restore card in hand on rejection
+      } else {
+        impactMedium();
+        onCardPlayed?.(card);
+        setHiddenCard(null);
+      }
     });
   }
 
-  function handleCardClick(card: Card) {
+  function handleCardClick(card: Card, fromRect: DOMRect) {
     if (!isMyTurn || ar.phase !== 'playing') return;
-    if (showSnapshot) return; // wait for trick reveal to finish
+    if (showSnapshot) return;
     if (!isLegal(card)) return;
+    if (hiddenCard) return; // prevent double-tap while card is in flight
     impactLight();
     if (card.isJoker) {
       setJokerModal(
@@ -174,6 +254,9 @@ export default function GameScreen({
       );
       return;
     }
+    const toRect = tableCenterRef.current?.getBoundingClientRect() ?? new DOMRect();
+    setHiddenCard(card);
+    setFlyingCard({ card, from: fromRect, to: toRect });
     emitCard(card, null);
   }
 
@@ -228,7 +311,7 @@ export default function GameScreen({
       <div className="gs-play-area">
 
         {/* Table zone: left opponents | trick center | right opponents */}
-        <div className="gs-table-zone">
+        <div className="gs-table-zone" ref={tableCenterRef}>
 
           <div className="gs-col gs-col--left">
             {leftOpps.map(p => (
@@ -238,6 +321,7 @@ export default function GameScreen({
                 score={gs.scores.find(s => s.playerId === p.id)}
                 ar={ar}
                 isCurrentTurn={ar.currentTurnPlayerId === p.id}
+                isWinner={winnerGlowId === p.id}
               />
             ))}
           </div>
@@ -256,6 +340,7 @@ export default function GameScreen({
                 score={gs.scores.find(s => s.playerId === p.id)}
                 ar={ar}
                 isCurrentTurn={ar.currentTurnPlayerId === p.id}
+                isWinner={winnerGlowId === p.id}
               />
             ))}
           </div>
@@ -266,7 +351,7 @@ export default function GameScreen({
         <div className="gs-bottom">
 
           {/* My info bar */}
-          <div className="gs-me-bar">
+          <div className={`gs-me-bar${winnerGlowId === myId ? ' gs-me-bar--winner' : ''}`}>
             <span className="gs-me-name">{myName}</span>
             <span className="gs-me-total">{myTotal}</span>
             {ar.phase === 'playing' && myBid !== undefined && (
@@ -304,6 +389,7 @@ export default function GameScreen({
               ar={ar}
               darkChoice={darkChoice}
               onSetDarkChoice={setDarkChoice}
+              isDealing={isDealing}
             />
           )}
 
@@ -316,6 +402,9 @@ export default function GameScreen({
             isLegal={isLegal}
             isComplete={ar.isComplete}
             trickResolving={showSnapshot}
+            isDealing={isDealing}
+            isHandRevealing={isHandRevealing}
+            hiddenCard={hiddenCard}
             onCardClick={handleCardClick}
           />
 
@@ -367,6 +456,34 @@ export default function GameScreen({
           onClose={() => setShowScoreSheet(false)}
         />
       )}
+
+      {/* ── Round result panel ──────────────────────────────────────────── */}
+      {showRoundResult && (
+        <RoundResultPanel ar={ar} gs={gs} myId={myId} players={room.players} />
+      )}
+
+      {/* ── Fly card overlay ────────────────────────────────────────────── */}
+      {flyingCard && (
+        <FlyCard
+          card={flyingCard.card}
+          from={flyingCard.from}
+          to={flyingCard.to}
+          onDone={() => setFlyingCard(null)}
+        />
+      )}
+
+      {/* ── Trick collect overlay ───────────────────────────────────────── */}
+      {collectState && (
+        <CollectOverlay
+          plays={collectState.plays}
+          direction={collectState.direction}
+          from={collectState.from}
+          onDone={() => setCollectState(null)}
+        />
+      )}
+
+      {/* ── Deal animation overlay ───────────────────────────────────────── */}
+      <DealAnimation active={isDealing} />
 
     </div>
   );
@@ -489,6 +606,130 @@ function LastTrickModal({ trick, players, onClose }: LastTrickModalProps) {
           })}
         </div>
         <p className="last-trick-winner">Взяв: <strong>{winnerName}</strong></p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Animation helpers & overlay components ───────────────────────────────────
+
+function reducedMotion(): boolean {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+}
+
+function getWinnerDirection(
+  winnerId: string,
+  myId: string,
+  leftOpps: GameRoom['players'],
+  rightOpps: GameRoom['players'],
+): 'left' | 'right' | 'bottom' {
+  if (winnerId === myId) return 'bottom';
+  if (leftOpps.some(p => p.id === winnerId)) return 'left';
+  return 'right';
+}
+
+const CARD_W = 48, CARD_H = 68; // gcard--md dimensions
+
+function FlyCard({ card, from, to, onDone }: { card: Card; from: DOMRect; to: DOMRect; onDone: () => void }) {
+  const [phase, setPhase] = useState<'init' | 'fly'>('init');
+  const dur = reducedMotion() ? 0 : 300;
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setPhase('fly'));
+    const t   = setTimeout(onDone, dur + 60);
+    return () => { cancelAnimationFrame(raf); clearTimeout(t); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fromL = from.left + from.width  / 2 - CARD_W / 2;
+  const fromT = from.top  + from.height / 2 - CARD_H / 2;
+  const toL   = to.left   + to.width    / 2 - CARD_W / 2;
+  const toT   = to.top    + to.height   / 2 - CARD_H / 2;
+
+  return (
+    <div
+      className="fly-card-overlay"
+      style={{
+        left: phase === 'fly' ? toL : fromL,
+        top:  phase === 'fly' ? toT : fromT,
+        transition: phase === 'fly' && dur > 0
+          ? `left ${dur}ms cubic-bezier(0.25,0.1,0.25,1), top ${dur}ms cubic-bezier(0.25,0.1,0.25,1)`
+          : 'none',
+      } as React.CSSProperties}
+    >
+      <GraphicCard card={card} size="md" />
+    </div>
+  );
+}
+
+function CollectOverlay({ plays, direction, from, onDone }: {
+  plays: TrickPlay[];
+  direction: 'left' | 'right' | 'bottom';
+  from: DOMRect;
+  onDone: () => void;
+}) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 560);
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const cx = from.left + from.width  / 2 - CARD_W / 2;
+  const cy = from.top  + from.height / 2 - CARD_H / 2;
+  const n  = plays.length;
+
+  return (
+    <>
+      {plays.map((play, i) => {
+        const jitter = (i - (n - 1) / 2) * 10;
+        return (
+          <div
+            key={play.playerId}
+            className={`collect-card-overlay collect-card--${direction}`}
+            style={{
+              left: cx + jitter,
+              top:  cy + Math.abs(jitter) * 0.2,
+              animationDelay: `${i * 35}ms`,
+            } as React.CSSProperties}
+          >
+            <GraphicCard card={play.card} size="md" />
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+function RoundResultPanel({ ar, gs, myId, players }: {
+  ar: ActiveRound;
+  gs: GameSheet;
+  myId: string;
+  players: GameRoom['players'];
+}) {
+  const roundDef = gs.rounds[ar.roundIndex];
+  return (
+    <div className="gs-round-result">
+      <p className="rr-title">Раунд {ar.roundIndex + 1} завершено</p>
+      {roundDef && <p className="rr-subtitle">{roundDef.label}</p>}
+      <div className="rr-table">
+        {players.map(p => {
+          const bid    = ar.bids[p.id];
+          const tricks = ar.tricksWon[p.id] ?? 0;
+          const score  = gs.scores.find(s => s.playerId === p.id);
+          const hit    = bid !== undefined && tricks === bid;
+          return (
+            <div
+              key={p.id}
+              className={[
+                'rr-row',
+                p.id === myId ? 'rr-row--me'   : '',
+                hit           ? 'rr-row--hit'  : 'rr-row--miss',
+              ].filter(Boolean).join(' ')}
+            >
+              <span className="rr-name">{p.name.slice(0, 10)}</span>
+              <span className="rr-bid">{bid !== undefined ? `${tricks}/${bid}` : '—'}</span>
+              <span className="rr-total">{score?.total ?? 0}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
