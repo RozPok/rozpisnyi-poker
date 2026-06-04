@@ -17,6 +17,9 @@ export interface TelegramHapticFeedback {
 interface TelegramWebApp {
   ready(): void;
   expand(): void;
+  /** Telegram client version string, e.g. "6.9" — available since Bot API 6.0 */
+  version?: string;
+  isVersionAtLeast?(version: string): boolean;
   initDataUnsafe: {
     user?: TelegramUser;
   };

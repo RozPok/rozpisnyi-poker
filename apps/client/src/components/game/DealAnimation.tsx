@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import type { CSSProperties } from 'react';
+import { recordDealAnim } from '../../debugStore.ts';
 
 interface DealCard {
   x: string;
@@ -25,11 +27,32 @@ const CARDS: DealCard[] = [
   { x:  '36vw', y: '-10vh', rot:  24, delay: 240 },
 ];
 
+const DEV = import.meta.env.DEV;
+
 interface Props {
   active: boolean;
 }
 
 export default function DealAnimation({ active }: Props) {
+  useEffect(() => {
+    if (!active) return;
+
+    recordDealAnim('started');
+
+    if (DEV) {
+      const rm = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+      console.log(
+        '[deal] DealAnimation started — reducedMotion:', rm,
+        '| isTelegram:', !!window.Telegram?.WebApp,
+      );
+    }
+
+    return () => {
+      recordDealAnim('ended');
+      if (DEV) console.log('[deal] DealAnimation ended');
+    };
+  }, [active]);
+
   if (!active) return null;
 
   return (

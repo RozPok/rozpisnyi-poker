@@ -2893,6 +2893,12 @@ body {
 /* prefers-reduced-motion: disable all gameplay animations */
 
 @media (prefers-reduced-motion: reduce) {
+  /* Deal animation */
+  .da-overlay { animation: none !important; }
+  .da-deck    { animation: none !important; }
+  .da-card    { animation: none !important; opacity: 0 !important; }
+
+  /* Gameplay animations */
   .fly-card-overlay,
   .collect-card-overlay,
   .ha-card-wrap--revealing,
@@ -2903,4 +2909,98 @@ body {
     transition: none !important;
   }
   .collect-card-overlay { opacity: 0; }
+}
+
+/* ── Debug modal ─────────────────────────────────────────────────────────── */
+
+.dbg-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12px 12px 40px;
+  overflow-y: auto;
+}
+
+.dbg-modal {
+  background: #0b1e10;
+  border: 1px solid rgba(201, 168, 76, 0.3);
+  border-radius: 14px;
+  padding: 16px;
+  width: 100%;
+  max-width: 390px;
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dbg-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.dbg-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  row-gap: 5px;
+  column-gap: 10px;
+}
+
+.dbg-key {
+  font-size: 0.68rem;
+  color: rgba(240, 234, 214, 0.5);
+  align-self: center;
+}
+
+.dbg-val {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(240, 234, 214, 0.85);
+  align-self: center;
+}
+
+.dbg-ok   { color: #86efac; }
+.dbg-warn { color: #fca5a5; }
+.dbg-wrap { word-break: break-all; grid-column: 1 / -1; font-size: 0.62rem; opacity: 0.6; font-weight: 400; }
+
+.dbg-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dbg-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dbg-btn {
+  flex: 1;
+  padding: 9px 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: rgba(201, 168, 76, 0.12);
+  border: 1px solid rgba(201, 168, 76, 0.4);
+  border-radius: 9px;
+  color: var(--gold);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.dbg-btn:active { filter: brightness(1.2); }
+
+.dbg-close {
+  align-self: center;
+  padding: 7px 20px;
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  touch-action: manipulation;
 }

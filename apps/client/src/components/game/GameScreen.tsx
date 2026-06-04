@@ -22,6 +22,7 @@ import {
   selectionChanged,
 } from '../../telegramHaptics.ts';
 import DealAnimation from './DealAnimation.tsx';
+import DebugModal   from './DebugModal.tsx';
 import GraphicCard  from './GraphicCard.tsx';
 import TopBar       from './TopBar.tsx';
 import OpponentSeat from './OpponentSeat.tsx';
@@ -68,6 +69,8 @@ export default function GameScreen({
   const [showLastTrick,   setShowLastTrick]   = useState(false);
   const [hapticsOn,       setHapticsOn]       = useState(getHapticsEnabled);
   const [isDealing,       setIsDealing]       = useState(false);
+  const [showDebug,       setShowDebug]       = useState(false);
+  const [testDealActive,  setTestDealActive]  = useState(false);
 
   // Animation state
   const [flyingCard,      setFlyingCard]      = useState<FlyingCard | null>(null);
@@ -297,6 +300,12 @@ export default function GameScreen({
               Вібрація: {hapticsOn ? 'Увімк.' : 'Вимк.'}
             </button>
             <button
+              className="gs-menu-item"
+              onClick={() => { setMenuOpen(false); setShowDebug(true); }}
+            >
+              Діагностика
+            </button>
+            <button
               className="gs-menu-item gs-menu-item--danger"
               disabled={isLeaving}
               onClick={() => { setMenuOpen(false); onLeave(); }}
@@ -483,7 +492,18 @@ export default function GameScreen({
       )}
 
       {/* ── Deal animation overlay ───────────────────────────────────────── */}
-      <DealAnimation active={isDealing} />
+      <DealAnimation active={isDealing || testDealActive} />
+
+      {/* ── Debug modal ─────────────────────────────────────────────────── */}
+      {showDebug && (
+        <DebugModal
+          onClose={() => setShowDebug(false)}
+          onTestDealAnim={() => {
+            setTestDealActive(true);
+            setTimeout(() => setTestDealActive(false), 1400);
+          }}
+        />
+      )}
 
     </div>
   );
