@@ -1,23 +1,51 @@
 import type { RoomPlayer, TrickPlay } from '@rozpisnyi-poker/shared';
 import GraphicCard from './GraphicCard.tsx';
 
+export interface BiddingEntry {
+  playerId: string;
+  name: string;
+  bid: number | undefined;
+  isCurrentBidder: boolean;
+}
+
 interface Props {
   plays: TrickPlay[] | null;
   /** non-null = showing completed trick, this player won it */
   winnerId: string | null;
   players: RoomPlayer[];
+  /** Present during bidding phase — shows center bid board instead of empty dot */
+  biddingEntries?: BiddingEntry[];
 }
 
-export default function TableCenter({ plays, winnerId, players }: Props) {
+export default function TableCenter({ plays, winnerId, players, biddingEntries }: Props) {
   const winnerName = winnerId
     ? (players.find(p => p.id === winnerId)?.name ?? null)
     : null;
 
+  const showBiddingBoard = biddingEntries && biddingEntries.length > 0 && plays === null;
+
   return (
     <div className="tc-root">
 
-      {/* Cards in play */}
-      {plays === null || plays.length === 0 ? (
+      {showBiddingBoard ? (
+        <div className="bb-root">
+          {biddingEntries!.map(entry => (
+            <div
+              key={entry.playerId}
+              className={[
+                'bb-row',
+                entry.isCurrentBidder ? 'bb-row--active' : '',
+                entry.bid !== undefined ? 'bb-row--done' : '',
+              ].filter(Boolean).join(' ')}
+            >
+              <span className="bb-name">{entry.name}</span>
+              <span className={`bb-bid${entry.bid === undefined ? ' bb-bid--pending' : ''}`}>
+                {entry.bid !== undefined ? entry.bid : '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : plays === null || plays.length === 0 ? (
         <div className="tc-empty">
           <span className="tc-empty-dot">●</span>
         </div>

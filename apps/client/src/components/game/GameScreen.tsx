@@ -140,15 +140,17 @@ export default function GameScreen({
     return () => clearTimeout(t);
   }, [winnerGlowId]);
 
-  // Round result + haptic: round finished
+  // Round result + haptic: round finished.
+  // Delay the overlay so the last trick snapshot is visible for ~3 seconds first.
   const prevIsCompleteRef = useRef(ar.isComplete);
   useEffect(() => {
-    if (ar.isComplete && !prevIsCompleteRef.current) {
-      impactHeavy();
-      notificationSuccess();
-      setShowRoundResult(true);
-    }
+    const wasComplete = prevIsCompleteRef.current;
     prevIsCompleteRef.current = ar.isComplete;
+    if (!ar.isComplete || wasComplete) return;
+    impactHeavy();
+    notificationSuccess();
+    const t = setTimeout(() => setShowRoundResult(true), 3100);
+    return () => clearTimeout(t);
   }, [ar.isComplete]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Deal animation — fires on every new round (roundIndex change) and on mount.
@@ -208,6 +210,16 @@ export default function GameScreen({
   const roundDef    = gs.rounds[ar.roundIndex];
   const currentPlayer = room.players.find(p => p.id === ar.currentTurnPlayerId);
 
+  // Center bidding board — shown in table center during bidding phase
+  const biddingEntries = ar.phase === 'bidding'
+    ? room.players.map(p => ({
+        playerId: p.id,
+        name: p.name,
+        bid: ar.bids[p.id] as number | undefined,
+        isCurrentBidder: ar.currentTurnPlayerId === p.id,
+      }))
+    : undefined;
+
   // Hand visibility (bidding phase)
   const showHand = ar.phase === 'playing'
     ? true
@@ -222,11 +234,21 @@ export default function GameScreen({
     return legalCards.some(c => c.suit === card.suit && c.rank === card.rank);
   }
 
-  // Split opponents left / right
-  const opponents  = room.players.filter(p => p.id !== myId);
-  const leftCount  = Math.ceil(opponents.length / 2);
-  const leftOpps   = opponents.slice(0, leftCount);
-  const rightOpps  = opponents.slice(leftCount);
+  // Split opponents left / right.
+  // Rotate so that the player immediately after me (clockwise) is first, giving
+  // a consistent relative seating regardless of who created the room.
+  // Split: ≤3 opponents → ceil (keeps the single "opposite" player on the left
+  // for small tables); ≥4 opponents → floor (balanced lean-right for large tables).
+  const myIndex = room.players.findIndex(p => p.id === myId);
+  const nPlayers = room.players.length;
+  const opponents = Array.from({ length: nPlayers - 1 }, (_, i) =>
+    room.players[(myIndex + 1 + i) % nPlayers]!
+  );
+  const leftCount = opponents.length <= 3
+    ? Math.ceil(opponents.length / 2)
+    : Math.floor(opponents.length / 2);
+  const leftOpps  = opponents.slice(0, leftCount);
+  const rightOpps = opponents.slice(leftCount);
 
   // ── Card-play helpers ─────────────────────────────────────────────────────
 
@@ -339,6 +361,7 @@ export default function GameScreen({
             plays={trickDisplayPlays}
             winnerId={snapshotWinnerId}
             players={room.players}
+            biddingEntries={biddingEntries}
           />
 
           <div className="gs-col gs-col--right">

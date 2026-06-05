@@ -71,7 +71,7 @@ export default function HandArea({
             >
               <GraphicCard
                 card={card}
-                size="md"
+                size="lg"
                 dimmed={dimmed}
                 illegal={illegal}
                 onClick={playable ? () => {
@@ -90,7 +90,9 @@ export default function HandArea({
 
 /** CSS transform for a fan spread. Cards rotate around their bottom-center. */
 function fanStyle(index: number, total: number): CSSProperties {
-  const marginLeft = index === 0 ? 0 : total <= 5 ? -10 : total <= 8 ? -16 : -20;
+  // Overlap is larger for lg cards (64 px wide) — keeps most hands scroll-free
+  // on a 360 px screen while keeping visible tap area ≥ 36 px per card.
+  const marginLeft = index === 0 ? 0 : total <= 5 ? -14 : total <= 8 ? -22 : -28;
   if (total <= 1) return { position: 'relative', marginLeft: `${marginLeft}px` };
 
   const norm  = (index / (total - 1)) * 2 - 1;           // -1..+1

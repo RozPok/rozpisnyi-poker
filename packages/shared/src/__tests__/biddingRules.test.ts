@@ -131,4 +131,45 @@ describe('getLegalBids', () => {
     const legal = getLegalBids(5, 2, true, [0, 0]);
     expect(legal).toEqual([...legal].sort((a, b) => a - b));
   });
+
+  // ── Special-round regression: getLegalBids must return a non-empty list
+  //    for the first bidder in all round types that have a bidding phase.
+  //    (no-trump, dark, and normal rounds all call getLegalBids with the same
+  //    parameters; misere/golden skip bidding entirely on the server.)
+
+  it('no-trump round: first bidder gets full range 0..N', () => {
+    // no-trump has the same bidding mechanics as normal/dark
+    expect(getLegalBids(5, 0, false, [])).toEqual([0, 1, 2, 3, 4, 5]);
+  });
+
+  it('no-trump round: last bidder cannot make total equal cardsPerPlayer', () => {
+    expect(getLegalBids(5, 3, true, [])).not.toContain(2);
+    expect(getLegalBids(5, 3, true, [])).toEqual([0, 1, 3, 4, 5]);
+  });
+
+  it('dark round: first bidder with no history gets full range', () => {
+    expect(getLegalBids(7, 0, false, [])).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it('dark round: zero-ban applies the same as in normal rounds', () => {
+    expect(getLegalBids(7, 0, false, [0, 0])).not.toContain(0);
+  });
+
+  it('first bidder always gets at least one legal bid (no stuck state)', () => {
+    // Exhaustively check cardsPerPlayer 1..11 for first bidder
+    for (let n = 1; n <= 11; n++) {
+      const bids = getLegalBids(n, 0, false, []);
+      expect(bids.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('last bidder always gets at least one legal bid when total < cardsPerPlayer', () => {
+    // If currentTotal < cardsPerPlayer, the forbidden value is cardsPerPlayer-total
+    // which may still leave other options open
+    for (let n = 2; n <= 11; n++) {
+      // Total = 0, last bidder: forbidden = n; still has 0..n-1 available
+      const bids = getLegalBids(n, 0, true, []);
+      expect(bids.length).toBeGreaterThan(0);
+    }
+  });
 });

@@ -1353,3 +1353,125 @@ describe('finishRound — dark bid scoring', () => {
     expect(gs.scores.find(s => s.playerId === 'p1')!.scores[0]).toBe(40);
   });
 });
+
+// ─── Special round types — bidding phase regression ───────────────────────────
+//
+// Regression: the no-trump round bidding phase was completely blocked in the UI
+// because BidPanel only showed bid buttons for 'dark' and 'normal' rounds.
+// These server-side tests verify that placeBid accepts bids in all round types
+// that have a bidding phase, so the server never silently rejects a valid bid.
+
+describe('placeBid — no-trump round', () => {
+  it('enters bidding phase (not playing) when the round starts', () => {
+    const room = makeRoomWithScores(3, 5, 'no-trump');
+    expect(room.activeRound!.phase).toBe('bidding');
+  });
+
+  it('has no trump card in a no-trump round', () => {
+    const room = makeRoomWithScores(3, 5, 'no-trump');
+    expect(room.activeRound!.trumpSuit).toBeNull();
+    expect(room.activeRound!.trumpCard).toBeNull();
+  });
+
+  it('accepts any bid in range for first bidder', () => {
+    const room = makeRoomWithScores(3, 5, 'no-trump');
+    const ar = room.activeRound!;
+    const firstBidder = ar.currentTurnPlayerId;
+    expect(placeBid(room, firstBidder, 2)).toEqual({ ok: true });
+  });
+
+  it('accepts bid 0 for first bidder with clean history', () => {
+    const room = makeRoomWithScores(3, 5, 'no-trump');
+    const firstBidder = room.activeRound!.currentTurnPlayerId;
+    expect(placeBid(room, firstBidder, 0)).toEqual({ ok: true });
+  });
+
+  it('accepts bid equal to cardsPerPlayer for first bidder', () => {
+    const room = makeRoomWithScores(3, 5, 'no-trump');
+    const firstBidder = room.activeRound!.currentTurnPlayerId;
+    expect(placeBid(room, firstBidder, 5)).toEqual({ ok: true });
+  });
+
+  it('transitions to playing phase after all players bid', () => {
+    const room = makeRoomWithScores(3, 5, 'no-trump');
+    const ar = room.activeRound!;
+    const [p1, p2, p3] = room.players.map(p => p.id);
+    ar.currentTurnPlayerId = p1!;
+    placeBid(room, p1!, 1);
+    placeBid(room, p2!, 2);
+    placeBid(room, p3!, 3);
+    expect(ar.phase).toBe('playing');
+  });
+
+  it('enforces last-bidder total rule the same as a normal round', () => {
+    const room = makeRoomWithScores(3, 5, 'no-trump');
+    const ar = room.activeRound!;
+    const [p1, p2, p3] = room.players.map(p => p.id);
+    ar.currentTurnPlayerId = p1!;
+    placeBid(room, p1!, 2);
+    placeBid(room, p2!, 1);
+    // total=3; forbidden for p3 is 2 (3+2=5=cardsPerPlayer)
+    expect(placeBid(room, p3!, 2)).toEqual({ ok: false, error: expect.any(String) });
+    expect(placeBid(room, p3!, 3)).toEqual({ ok: true });
+  });
+});
+
+describe('placeBid — dark round', () => {
+  it('enters bidding phase when the round starts', () => {
+    const room = makeRoomWithScores(3, 5, 'dark');
+    expect(room.activeRound!.phase).toBe('bidding');
+  });
+
+  it('has a trump card in a dark round', () => {
+    const room = makeRoomWithScores(3, 5, 'dark');
+    expect(room.activeRound!.trumpSuit).not.toBeNull();
+  });
+
+  it('accepts bid with isDark=true and stores flag', () => {
+    const room = makeRoomWithScores(3, 5, 'dark');
+    const firstBidder = room.activeRound!.currentTurnPlayerId;
+    expect(placeBid(room, firstBidder, 2, true)).toEqual({ ok: true });
+    expect(room.activeRound!.playerDarkFlags[firstBidder]).toBe(true);
+  });
+
+  it('accepts bid with isDark=false', () => {
+    const room = makeRoomWithScores(3, 5, 'dark');
+    const firstBidder = room.activeRound!.currentTurnPlayerId;
+    expect(placeBid(room, firstBidder, 2, false)).toEqual({ ok: true });
+  });
+
+  it('transitions to playing phase after all bids', () => {
+    const room = makeRoomWithScores(3, 5, 'dark');
+    const ar = room.activeRound!;
+    const [p1, p2, p3] = room.players.map(p => p.id);
+    ar.currentTurnPlayerId = p1!;
+    placeBid(room, p1!, 1, false);
+    placeBid(room, p2!, 2, true);
+    placeBid(room, p3!, 3, false);
+    expect(ar.phase).toBe('playing');
+  });
+});
+
+describe('misere and golden rounds skip bidding', () => {
+  it('misere round starts directly in playing phase', () => {
+    const room = makeRoomWithScores(3, 5, 'misere');
+    expect(room.activeRound!.phase).toBe('playing');
+  });
+
+  it('golden round starts directly in playing phase', () => {
+    const room = makeRoomWithScores(3, 5, 'golden');
+    expect(room.activeRound!.phase).toBe('playing');
+  });
+
+  it('placeBid is rejected for misere (already in playing phase)', () => {
+    const room = makeRoomWithScores(3, 5, 'misere');
+    const firstPlayer = room.activeRound!.currentTurnPlayerId;
+    expect(placeBid(room, firstPlayer, 0)).toEqual({ ok: false, error: expect.any(String) });
+  });
+
+  it('placeBid is rejected for golden (already in playing phase)', () => {
+    const room = makeRoomWithScores(3, 5, 'golden');
+    const firstPlayer = room.activeRound!.currentTurnPlayerId;
+    expect(placeBid(room, firstPlayer, 5)).toEqual({ ok: false, error: expect.any(String) });
+  });
+});

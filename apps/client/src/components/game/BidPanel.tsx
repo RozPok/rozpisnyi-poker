@@ -44,7 +44,9 @@ export default function BidPanel({
     ? getLegalBids(ar.cardsPerPlayer, currentTotal, isLastBidder, bidHistory)
     : [];
 
-  const showBidInput = isMyTurn && (isDarkRound || (isNormalRound && darkChoice !== null));
+  // Show bid number picker for any round that doesn't need the dark/not-dark
+  // choice first. Only 'normal' rounds require that choice gate.
+  const showBidInput = isMyTurn && (!isNormalRound || darkChoice !== null);
   const currentPlayer = room.players.find(p => p.id === ar.currentTurnPlayerId);
 
   function handleBid() {
@@ -73,30 +75,6 @@ export default function BidPanel({
         <span>
           {isMyTurn ? 'Ваша ставка!' : `Ставить: ${currentPlayer?.name ?? '…'}`}
         </span>
-      </div>
-
-      {/* Bids summary row */}
-      <div className="bp-bids-row">
-        {room.players.map(p => {
-          const hasBid   = p.id in ar.bids;
-          const isCurr   = p.id === ar.currentTurnPlayerId;
-          return (
-            <span
-              key={p.id}
-              className={[
-                'bp-bid-chip',
-                hasBid          ? 'bp-bid-chip--done'   : '',
-                isCurr && !hasBid ? 'bp-bid-chip--active' : '',
-                p.id === myId   ? 'bp-bid-chip--me'     : '',
-              ].filter(Boolean).join(' ')}
-            >
-              <span className="bp-chip-name">{p.name.slice(0, 4)}</span>
-              <span className="bp-chip-val">
-                {hasBid ? ar.bids[p.id] : isCurr ? '…' : '—'}
-              </span>
-            </span>
-          );
-        })}
       </div>
 
       {/* Dark / not-dark choice (normal rounds only) */}
