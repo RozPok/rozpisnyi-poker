@@ -176,6 +176,8 @@ export interface RoomPlayer {
    * isConnected=false but isVacant=false and cannot be replaced.
    */
   isVacant?: boolean;
+  /** True for server-side AI players in test mode rooms. */
+  isBot?: boolean;
 }
 
 /** A player during active gameplay — extends RoomPlayer with cards and score. */
@@ -198,6 +200,11 @@ export interface GameRoom {
   gameSheet: GameSheet | null;
   activeRound: ActiveRound | null; // null while status === 'waiting'
   createdAt: number;
+  mode: 'normal' | 'test';
+  /** Set for test-mode rooms — the single round to play. */
+  testRound?: { type: RoundType; cardsPerPlayer: number; label: string };
+  /** Target total player count for test-mode rooms (including the human owner). */
+  testPlayerCount?: number;
 }
 
 // ─── Socket acknowledgement result ────────────────────────────────────────────
@@ -239,4 +246,10 @@ export interface ClientToServerEvents {
     declaration: JokerDeclaration | null,
     callback: (result: PlayResult) => void,
   ) => void;
+  'testlab:create': (
+    payload: { playerName: string; playerCount: number; roundType: RoundType; cardsPerPlayer: number; label: string },
+    callback: (result: RoomResult) => void,
+  ) => void;
+  'testlab:add-bot': (callback: (result: RoomResult) => void) => void;
+  'testlab:fill-bots': (callback: (result: RoomResult) => void) => void;
 }

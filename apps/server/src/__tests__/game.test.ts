@@ -26,6 +26,7 @@ function makeRoom(playerCount: number, cardsPerPlayer: number): GameRoom {
     },
     activeRound: null,
     createdAt: Date.now(),
+    mode: 'normal',
   };
 
   const { activeRound } = dealRound(room);
@@ -80,6 +81,7 @@ function makeRoomAtRound(
     gameSheet: { rounds, scores, currentRoundIndex: roundIndex },
     activeRound: null,
     createdAt: Date.now(),
+    mode: 'normal',
   };
 
   const { activeRound } = dealRound(room);
@@ -122,6 +124,7 @@ function makeRoomForDeal(playerCount: number, cardsPerPlayer: number, roundIndex
     },
     activeRound: null,
     createdAt: Date.now(),
+    mode: 'normal',
   };
   const { activeRound } = dealRound(room);
   room.activeRound = activeRound;
@@ -490,6 +493,7 @@ function makeRoomWithScores(
     },
     activeRound: null,
     createdAt: Date.now(),
+    mode: 'normal',
   };
 
   const { activeRound } = dealRound(room);
@@ -754,6 +758,7 @@ describe('finishRound — hand sizes', () => {
       },
       activeRound: null,
       createdAt: Date.now(),
+      mode: 'normal',
     };
     const { activeRound: ar0 } = dealRound(room);
     room.activeRound = ar0;

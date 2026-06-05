@@ -4,6 +4,7 @@ import { socket, myPlayerId, saveSession, loadSession, clearSession } from './so
 import { initTelegram, isTelegram, getTelegramUser } from './telegram.ts';
 import Home from './pages/Home.tsx';
 import Lobby from './pages/Lobby.tsx';
+import TestLab from './components/TestLab.tsx';
 
 // Resolved once at module load — window.Telegram is synchronously available
 // because the script tag in index.html has no defer/async attribute.
@@ -13,7 +14,7 @@ const tgPlayerName = tgUser
   ? (tgUser.first_name || tgUser.username || '')
   : undefined;
 
-type Page = 'home' | 'lobby' | 'restoring';
+type Page = 'home' | 'lobby' | 'testlab' | 'restoring';
 
 export default function App() {
   const [page, setPage] = useState<Page>('restoring');
@@ -128,6 +129,15 @@ export default function App() {
     );
   }
 
+  if (page === 'testlab') {
+    return (
+      <TestLab
+        onGameStarted={handleRoomJoined}
+        onBack={() => setPage('home')}
+      />
+    );
+  }
+
   if (page === 'lobby' && room) {
     return (
       <>
@@ -142,6 +152,7 @@ export default function App() {
   return (
     <Home
       onRoomJoined={handleRoomJoined}
+      onTestLab={() => setPage('testlab')}
       restoreError={restoreError}
       tgPlayerName={tgPlayerName}
       isTgMode={tgMode}

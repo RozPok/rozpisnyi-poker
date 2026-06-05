@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { ROOM_MAX_PLAYERS } from '@rozpisnyi-poker/shared';
-import type { GameRoom, RoomPlayer } from '@rozpisnyi-poker/shared';
+import type { GameRoom, RoomPlayer, RoundType } from '@rozpisnyi-poker/shared';
 
 // ─── Code generation ─────────────────────────────────────────────────────────
 
@@ -39,10 +39,70 @@ export function createRoom(ownerId: string, ownerName: string): GameRoom {
     gameSheet: null,
     activeRound: null,
     createdAt: Date.now(),
+    mode: 'normal',
   };
   byId.set(room.id, room);
   byCode.set(code, room.id);
   playerRoom.set(ownerId, room.id);
+  return room;
+}
+
+export function createTestRoom(
+  ownerId: string,
+  ownerName: string,
+  playerCount: number,
+  testRound: { type: RoundType; cardsPerPlayer: number; label: string },
+): GameRoom {
+  const code = generateCode();
+  const room: GameRoom = {
+    id: randomUUID(),
+    code,
+    ownerId,
+    players: [makePlayer(ownerId, ownerName)],
+    status: 'waiting',
+    gameSheet: null,
+    activeRound: null,
+    createdAt: Date.now(),
+    mode: 'test',
+    testRound,
+    testPlayerCount: playerCount,
+  };
+  byId.set(room.id, room);
+  byCode.set(code, room.id);
+  playerRoom.set(ownerId, room.id);
+  return room;
+}
+
+export function addBotToRoom(roomId: string): GameRoom | string {
+  const room = byId.get(roomId);
+  if (!room) return 'Кімнату не знайдено';
+  if (room.mode !== 'test') return 'Боти доступні лише в тестовому режимі';
+  if (room.status !== 'waiting') return 'Гра вже розпочата';
+  const targetCount = room.testPlayerCount ?? ROOM_MAX_PLAYERS;
+  if (room.players.length >= targetCount) return 'Кімната вже заповнена';
+
+  const botCount = room.players.filter(p => p.isBot).length;
+  const bot: RoomPlayer = {
+    id: `bot-${randomUUID().replace(/-/g, '')}`,
+    name: `🤖 Бот ${botCount + 1}`,
+    isConnected: true,
+    isBot: true,
+  };
+  room.players.push(bot);
+  return room;
+}
+
+export function fillBotsInRoom(roomId: string): GameRoom | string {
+  const room = byId.get(roomId);
+  if (!room) return 'Кімнату не знайдено';
+  if (room.mode !== 'test') return 'Боти доступні лише в тестовому режимі';
+  if (room.status !== 'waiting') return 'Гра вже розпочата';
+
+  const targetCount = room.testPlayerCount ?? ROOM_MAX_PLAYERS;
+  while (room.players.length < targetCount) {
+    const result = addBotToRoom(roomId);
+    if (typeof result === 'string') return result;
+  }
   return room;
 }
 

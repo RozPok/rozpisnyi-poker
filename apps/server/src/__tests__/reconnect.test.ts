@@ -38,6 +38,7 @@ function makeInProgressRoom(playerIds: string[]): GameRoom {
     },
     activeRound: null,
     createdAt: Date.now(),
+    mode: 'normal',
   };
   const { activeRound } = dealRound(room);
   room.activeRound = activeRound;

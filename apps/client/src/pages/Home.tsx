@@ -8,6 +8,7 @@ type HomeView = 'menu' | 'create' | 'join';
 
 interface Props {
   onRoomJoined: (room: GameRoom, playerName: string) => void;
+  onTestLab: () => void;
   restoreError?: string;
   /** Name pre-filled from Telegram initDataUnsafe.user */
   tgPlayerName?: string;
@@ -15,7 +16,7 @@ interface Props {
   isTgMode?: boolean;
 }
 
-export default function Home({ onRoomJoined, restoreError, tgPlayerName, isTgMode }: Props) {
+export default function Home({ onRoomJoined, onTestLab, restoreError, tgPlayerName, isTgMode }: Props) {
   const [view, setView] = useState<HomeView>('menu');
   const [playerName, setPlayerName] = useState(tgPlayerName ?? '');
   const [roomCode, setRoomCode] = useState('');
@@ -146,6 +147,9 @@ export default function Home({ onRoomJoined, restoreError, tgPlayerName, isTgMod
         </button>
         <button className="btn btn-secondary" onClick={() => setView('join')}>
           Приєднатися до гри
+        </button>
+        <button className="btn btn-ghost" onClick={onTestLab}>
+          Тест Лаб
         </button>
       </div>
       <ServerStatusBadge status={serverStatus} />

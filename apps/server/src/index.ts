@@ -8,6 +8,7 @@ import {
 import type { ClientToServerEvents, ServerToClientEvents } from '@rozpisnyi-poker/shared';
 import * as rooms from './rooms';
 import * as game from './game';
+import { scheduleBotAction } from './bots.js';
 
 const PORT          = process.env.PORT ?? 3001;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173';
@@ -157,6 +158,43 @@ io.on('connection', socket => {
     callback({ ok: true, room: result, hand });
   });
 
+  // ── testlab:create ──────────────────────────────────────────────────────────
+  socket.on('testlab:create', ({ playerName, playerCount, roundType, cardsPerPlayer, label }, callback) => {
+    const trimmed = playerName.trim();
+    if (!trimmed) {
+      callback({ ok: false, error: "Ім'я не може бути порожнім" });
+      return;
+    }
+    if (rooms.getRoomByPlayerId(stableId)) {
+      callback({ ok: false, error: 'Ви вже перебуваєте в кімнаті' });
+      return;
+    }
+    const room = rooms.createTestRoom(stableId, trimmed, playerCount, { type: roundType, cardsPerPlayer, label });
+    socket.join(room.id);
+    console.log(`[testlab] created ${room.code} by "${trimmed}" (${playerCount}p, ${label})`);
+    callback({ ok: true, room });
+  });
+
+  // ── testlab:add-bot ─────────────────────────────────────────────────────────
+  socket.on('testlab:add-bot', callback => {
+    const room = rooms.getRoomByPlayerId(stableId);
+    if (!room) { callback({ ok: false, error: 'Кімнату не знайдено' }); return; }
+    const result = rooms.addBotToRoom(room.id);
+    if (typeof result === 'string') { callback({ ok: false, error: result }); return; }
+    io.to(room.id).emit('room:updated', result);
+    callback({ ok: true, room: result });
+  });
+
+  // ── testlab:fill-bots ───────────────────────────────────────────────────────
+  socket.on('testlab:fill-bots', callback => {
+    const room = rooms.getRoomByPlayerId(stableId);
+    if (!room) { callback({ ok: false, error: 'Кімнату не знайдено' }); return; }
+    const result = rooms.fillBotsInRoom(room.id);
+    if (typeof result === 'string') { callback({ ok: false, error: result }); return; }
+    io.to(room.id).emit('room:updated', result);
+    callback({ ok: true, room: result });
+  });
+
   // ── game:start ──────────────────────────────────────────────────────────────
   socket.on('game:start', callback => {
     const room = rooms.getRoomByPlayerId(stableId);
@@ -177,14 +215,31 @@ io.on('connection', socket => {
       return;
     }
 
-    const sheet = generateGameSheet(room.players.length);
-    sheet.scores = room.players.map(p => ({
-      playerId: p.id,
-      name: p.name,
-      bids: new Array<number | null>(sheet.rounds.length).fill(null),
-      scores: new Array<number | null>(sheet.rounds.length).fill(null),
-      total: 0,
-    }));
+    const sheet = (() => {
+      if (room.mode === 'test' && room.testRound) {
+        const tr = room.testRound;
+        return {
+          rounds: [{ index: 0, type: tr.type, cardsPerPlayer: tr.cardsPerPlayer, label: tr.label }],
+          scores: room.players.map(p => ({
+            playerId: p.id,
+            name: p.name,
+            bids: new Array<number | null>(1).fill(null),
+            scores: new Array<number | null>(1).fill(null),
+            total: 0,
+          })),
+          currentRoundIndex: 0,
+        };
+      }
+      const s = generateGameSheet(room.players.length);
+      s.scores = room.players.map(p => ({
+        playerId: p.id,
+        name: p.name,
+        bids: new Array<number | null>(s.rounds.length).fill(null),
+        scores: new Array<number | null>(s.rounds.length).fill(null),
+        total: 0,
+      }));
+      return s;
+    })();
 
     room.status = 'in-progress';
     room.gameSheet = sheet;
@@ -195,12 +250,15 @@ io.on('connection', socket => {
     io.to(room.id).emit('room:updated', room);
 
     for (const player of room.players) {
-      const hand = handsMap.get(player.id) ?? [];
-      io.to(player.id).emit('hand:dealt', hand);
+      if (!player.isBot) {
+        const hand = handsMap.get(player.id) ?? [];
+        io.to(player.id).emit('hand:dealt', hand);
+      }
     }
 
-    console.log(`[game] started in ${room.code} — ${sheet.rounds.length} rounds, ${activeRound.cardsPerPlayer} cards/player`);
+    console.log(`[game] started in ${room.code} — ${sheet.rounds.length} rounds, ${activeRound.cardsPerPlayer} cards/player${room.mode === 'test' ? ' [test]' : ''}`);
     callback({ ok: true, room });
+    scheduleBotAction(room, io);
   });
 
   // ── bid:submit ──────────────────────────────────────────────────────────────
@@ -213,6 +271,7 @@ io.on('connection', socket => {
     const result = game.placeBid(room, stableId, tricks, isDark);
     if (result.ok) {
       io.to(room.id).emit('room:updated', room);
+      scheduleBotAction(room, io);
     }
     callback(result);
   });
@@ -249,12 +308,16 @@ io.on('connection', socket => {
         io.to(room.id).emit('room:updated', room);
         if (nextHandsMap) {
           for (const player of room.players) {
-            io.to(player.id).emit('hand:dealt', nextHandsMap.get(player.id) ?? []);
+            if (!player.isBot) {
+              io.to(player.id).emit('hand:dealt', nextHandsMap.get(player.id) ?? []);
+            }
           }
+          scheduleBotAction(room, io);
         }
       }, TRICK_REVEAL_MS);
     } else {
       io.to(room.id).emit('room:updated', room);
+      scheduleBotAction(room, io);
     }
   });
 
