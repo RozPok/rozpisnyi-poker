@@ -90,14 +90,25 @@ export default function HandArea({
 
 /** CSS transform for a fan spread. Cards rotate around their bottom-center. */
 function fanStyle(index: number, total: number): CSSProperties {
-  // Overlap is larger for lg cards (64 px wide) — keeps most hands scroll-free
-  // on a 360 px screen while keeping visible tap area ≥ 36 px per card.
-  const marginLeft = index === 0 ? 0 : total <= 5 ? -14 : total <= 8 ? -22 : -28;
+  // Overlap tuned so all hands fit within 390 px without horizontal scroll.
+  // 9+ cards: compact mode — tighter overlap, lower rotation angle.
+  // Total visible width = 64 + (total-1) * (64 - |marginLeft|)
+  //   8 cards, -24: 64 + 7*40 = 344 px  ✓
+  //   10 cards,-30: 64 + 9*34 = 370 px  ✓
+  //   11 cards,-36: 64 + 10*28 = 344 px ✓
+  const marginLeft = index === 0 ? 0
+    : total <= 5  ? -14
+    : total <= 8  ? -24
+    : total <= 10 ? -30
+    : -36;
+
   if (total <= 1) return { position: 'relative', marginLeft: `${marginLeft}px` };
 
-  const norm  = (index / (total - 1)) * 2 - 1;           // -1..+1
-  const angle = norm * Math.min(14, total * 1.8);          // max ±14°
-  const droop = norm * norm * 5;                           // parabolic vertical offset
+  const norm     = (index / (total - 1)) * 2 - 1;  // -1..+1
+  // Compact mode: lower rotation so extreme cards don't rise far above container.
+  const maxAngle = total <= 5 ? 14 : total <= 8 ? 12 : 8;
+  const angle    = norm * Math.min(maxAngle, total * 1.5);
+  const droop    = norm * norm * 3;                 // parabolic vertical offset (reduced)
 
   return {
     position: 'relative',

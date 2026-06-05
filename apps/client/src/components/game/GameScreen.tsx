@@ -79,6 +79,7 @@ export default function GameScreen({
   const [winnerGlowId,    setWinnerGlowId]    = useState<string | null>(null);
   const [isHandRevealing, setIsHandRevealing] = useState(false);
   const [showRoundResult, setShowRoundResult] = useState(false);
+  const [completedArSnapshot, setCompletedArSnapshot] = useState<ActiveRound | null>(null);
 
   // Bidding: dark-choice lifted here so HandArea can compute visibility
   const [darkChoice, setDarkChoice] = useState<'dark' | 'not-dark' | null>(null);
@@ -140,18 +141,39 @@ export default function GameScreen({
     return () => clearTimeout(t);
   }, [winnerGlowId]);
 
-  // Round result + haptic: round finished.
-  // Delay the overlay so the last trick snapshot is visible for ~3 seconds first.
+  // Round result + haptic: show completed-round overlay 3.1 s after round ends,
+  // keep visible for 3 s, then auto-dismiss.  Timer refs survive the ar.isComplete
+  // → false transition (new round arrives) so the overlay is always shown.
   const prevIsCompleteRef = useRef(ar.isComplete);
+  const completedRoundTokenRef = useRef(0);
+  const showResultTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     const wasComplete = prevIsCompleteRef.current;
     prevIsCompleteRef.current = ar.isComplete;
     if (!ar.isComplete || wasComplete) return;
     impactHeavy();
     notificationSuccess();
-    const t = setTimeout(() => setShowRoundResult(true), 3100);
-    return () => clearTimeout(t);
+    const token = ++completedRoundTokenRef.current;
+    const snapshot = ar; // ar object is replaced (not mutated) on next render — closure is safe
+    if (showResultTimerRef.current) clearTimeout(showResultTimerRef.current);
+    showResultTimerRef.current = setTimeout(() => {
+      setCompletedArSnapshot(snapshot);
+      setShowRoundResult(true);
+      setTimeout(() => {
+        if (completedRoundTokenRef.current === token) {
+          setShowRoundResult(false);
+          setCompletedArSnapshot(null);
+        }
+      }, 3000);
+    }, 3100);
+    // No cleanup return — timers must survive when ar changes to the new round.
   }, [ar.isComplete]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cancel pending show timer on unmount.
+  useEffect(() => () => {
+    if (showResultTimerRef.current) clearTimeout(showResultTimerRef.current);
+  }, []);
 
   // Deal animation — fires on every new round (roundIndex change) and on mount.
   // useLayoutEffect sets isDealing=true synchronously before first paint → no flash.
@@ -159,13 +181,17 @@ export default function GameScreen({
   useLayoutEffect(() => {
     if (lastAnimatedRoundIndexRef.current === ar.roundIndex) return;
     lastAnimatedRoundIndexRef.current = ar.roundIndex;
-    if (ar.phase !== 'bidding') return; // skip reconnect to mid-round (playing phase)
-    setIsDealing(true);
-    // Clear animation state from previous round
-    setShowRoundResult(false);
+    // Always reset per-round state regardless of phase.
+    // CRITICAL: misere/golden start in 'playing' phase — without this, state from
+    // the previous round (e.g. showRoundResult, collectState) would persist and
+    // permanently block the UI, making the game appear to end prematurely.
     setCollectState(null);
     setFlyingCard(null);
     setHiddenCard(null);
+    setDarkChoice(null);
+    setJokerModal(null);
+    if (ar.phase !== 'bidding') return; // skip reconnect to mid-round (playing phase)
+    setIsDealing(true);
   }, [ar.roundIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Haptics + 1200 ms timer; keyed on both roundIndex and isDealing so the cleanup
@@ -490,8 +516,8 @@ export default function GameScreen({
       )}
 
       {/* ── Round result panel ──────────────────────────────────────────── */}
-      {showRoundResult && (
-        <RoundResultPanel ar={ar} gs={gs} myId={myId} players={room.players} />
+      {showRoundResult && completedArSnapshot && (
+        <RoundResultPanel ar={completedArSnapshot} gs={gs} myId={myId} players={room.players} />
       )}
 
       {/* ── Fly card overlay ────────────────────────────────────────────── */}

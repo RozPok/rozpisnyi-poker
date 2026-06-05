@@ -630,6 +630,75 @@ describe('finishRound — round progression', () => {
     const room = makeRoomWithScores(3, 3, 'normal');
     expect(() => finishRound(room)).toThrow();
   });
+
+  it('does not end game after dark round when misere/golden rounds remain', () => {
+    const room = makeRoomWithScores(3, 3, 'dark', [
+      { index: 1, type: 'misere' as const,  cardsPerPlayer: 3, label: 'М' },
+      { index: 2, type: 'golden' as const,  cardsPerPlayer: 3, label: 'З' },
+    ]);
+    forceComplete(room, { p1: 1, p2: 1, p3: 1 }, { p1: 1, p2: 1, p3: 1 });
+    finishRound(room);
+    expect(room.status).not.toBe('finished');
+    expect(room.activeRound).not.toBeNull();
+    expect(room.activeRound!.phase).toBe('playing');  // misere skips bidding
+    expect(room.activeRound!.roundIndex).toBe(1);
+  });
+
+  it('does not end game after no-trump round when misere rounds remain', () => {
+    const room = makeRoomWithScores(3, 3, 'no-trump', [
+      { index: 1, type: 'misere' as const, cardsPerPlayer: 3, label: 'М' },
+    ]);
+    forceComplete(room, { p1: 0, p2: 1, p3: 2 }, { p1: 0, p2: 2, p3: 1 });
+    const { nextHandsMap } = finishRound(room);
+    expect(room.status).not.toBe('finished');
+    expect(nextHandsMap).not.toBeNull();
+    expect(room.activeRound!.phase).toBe('playing');
+    expect(room.activeRound!.roundIndex).toBe(1);
+  });
+
+  it('full 5-type sequence completes all rounds without premature game end', () => {
+    const room = makeRoomWithScores(3, 3, 'normal', [
+      { index: 1, type: 'no-trump' as const, cardsPerPlayer: 3, label: 'Б' },
+      { index: 2, type: 'dark'     as const, cardsPerPlayer: 3, label: 'Т' },
+      { index: 3, type: 'misere'   as const, cardsPerPlayer: 3, label: 'М' },
+      { index: 4, type: 'golden'   as const, cardsPerPlayer: 3, label: 'З' },
+    ]);
+
+    // Round 0: normal (bidding)
+    expect(room.activeRound!.phase).toBe('bidding');
+    forceComplete(room, { p1: 1, p2: 1, p3: 1 }, { p1: 1, p2: 1, p3: 1 });
+    finishRound(room);
+    expect(room.status).not.toBe('finished');
+
+    // Round 1: no-trump (bidding)
+    expect(room.activeRound!.roundIndex).toBe(1);
+    expect(room.activeRound!.phase).toBe('bidding');
+    forceComplete(room, { p1: 0, p2: 1, p3: 2 }, { p1: 0, p2: 2, p3: 1 });
+    finishRound(room);
+    expect(room.status).not.toBe('finished');
+
+    // Round 2: dark (bidding)
+    expect(room.activeRound!.roundIndex).toBe(2);
+    expect(room.activeRound!.phase).toBe('bidding');
+    forceComplete(room, { p1: 1, p2: 1, p3: 1 }, { p1: 1, p2: 1, p3: 1 });
+    finishRound(room);
+    expect(room.status).not.toBe('finished');
+
+    // Round 3: misere (playing — skips bidding)
+    expect(room.activeRound!.roundIndex).toBe(3);
+    expect(room.activeRound!.phase).toBe('playing');
+    forceComplete(room, {}, { p1: 0, p2: 0, p3: 3 });
+    finishRound(room);
+    expect(room.status).not.toBe('finished');
+
+    // Round 4: golden (playing — skips bidding, last round)
+    expect(room.activeRound!.roundIndex).toBe(4);
+    expect(room.activeRound!.phase).toBe('playing');
+    forceComplete(room, {}, { p1: 3, p2: 0, p3: 0 });
+    const { nextHandsMap } = finishRound(room);
+    expect(room.status).toBe('finished');
+    expect(nextHandsMap).toBeNull();
+  });
 });
 
 // ─── Hand sizes across round progression ─────────────────────────────────────

@@ -2468,13 +2468,10 @@ body {
   align-items: flex-end;
   height: 120px;
   padding-bottom: 2px;
-  padding-top: 20px; /* room for fan upswing with larger cards */
-  overflow-x: auto;
-  overflow-y: visible;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  padding-top: 20px; /* room for fan upswing */
+  overflow-x: clip;  /* clip overflow without creating a scroll container */
+  overflow-y: visible; /* allow card tops to poke above (CSS3 clip exempts y coercion) */
 }
-.ha-cards::-webkit-scrollbar { display: none; }
 
 .ha-card-wrap {
   flex-shrink: 0;
