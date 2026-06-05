@@ -243,6 +243,7 @@ export default function GameScreen({
         name: p.name,
         bid: ar.bids[p.id] as number | undefined,
         isCurrentBidder: ar.currentTurnPlayerId === p.id,
+        isDark: ar.playerDarkFlags[p.id] ?? false,
       }))
     : undefined;
 
@@ -377,6 +378,7 @@ export default function GameScreen({
                 player={p}
                 score={gs.scores.find(s => s.playerId === p.id)}
                 ar={ar}
+                roundType={roundDef?.type}
                 isCurrentTurn={ar.currentTurnPlayerId === p.id}
                 isWinner={winnerGlowId === p.id}
               />
@@ -397,6 +399,7 @@ export default function GameScreen({
                 player={p}
                 score={gs.scores.find(s => s.playerId === p.id)}
                 ar={ar}
+                roundType={roundDef?.type}
                 isCurrentTurn={ar.currentTurnPlayerId === p.id}
                 isWinner={winnerGlowId === p.id}
               />
@@ -412,11 +415,24 @@ export default function GameScreen({
           <div className={`gs-me-bar${winnerGlowId === myId ? ' gs-me-bar--winner' : ''}`}>
             <span className="gs-me-name">{myName}</span>
             <span className="gs-me-total">{myTotal}</span>
-            {ar.phase === 'playing' && myBid !== undefined && (
-              <span className={`gs-me-tricks${myTricks === myBid ? ' gs-me-tricks--exact' : ''}`}>
-                {myTricks}/{myBid}
-              </span>
-            )}
+            {ar.phase === 'playing' && (myBid !== undefined || roundDef?.type === 'misere' || roundDef?.type === 'golden') && (() => {
+              const isDarkBid   = ar.playerDarkFlags[myId] ?? false;
+              const isMisere    = roundDef?.type === 'misere';
+              const misereWarn  = isMisere && myTricks > 0;
+              const exact       = myBid !== undefined && myTricks === myBid;
+              const label       = myBid !== undefined
+                ? `${myTricks}/${myBid}${isDarkBid ? 'Т' : ''}`
+                : `${myTricks}`;
+              return (
+                <span className={[
+                  'gs-me-tricks',
+                  exact       ? 'gs-me-tricks--exact' : '',
+                  misereWarn  ? 'gs-me-tricks--warn'  : '',
+                ].filter(Boolean).join(' ')}>
+                  {label}
+                </span>
+              );
+            })()}
             {ar.jokerDeclaration && (
               <span className="gs-joker-badge">
                 Жопа: {jokerDeclarationLabel(ar.jokerDeclaration)}
@@ -783,7 +799,22 @@ function RoundResultPanel({ ar, gs, myId, players }: {
           const bid    = ar.bids[p.id];
           const tricks = ar.tricksWon[p.id] ?? 0;
           const score  = gs.scores.find(s => s.playerId === p.id);
-          const hit    = bid !== undefined && tricks === bid;
+          const isDark = ar.playerDarkFlags[p.id] ?? false;
+          const isMisere  = roundDef?.type === 'misere';
+          const isGolden  = roundDef?.type === 'golden';
+          const hit = bid !== undefined ? tricks === bid : false;
+
+          let bidDisplay: string;
+          if (bid !== undefined) {
+            bidDisplay = `${tricks}/${bid}${isDark ? 'Т' : ''}`;
+          } else if (isMisere || isGolden) {
+            bidDisplay = String(tricks);
+          } else {
+            bidDisplay = '—';
+          }
+
+          const misereWarn = isMisere && tricks > 0;
+
           return (
             <div
               key={p.id}
@@ -794,7 +825,7 @@ function RoundResultPanel({ ar, gs, myId, players }: {
               ].filter(Boolean).join(' ')}
             >
               <span className="rr-name">{p.name.slice(0, 10)}</span>
-              <span className="rr-bid">{bid !== undefined ? `${tricks}/${bid}` : '—'}</span>
+              <span className={`rr-bid${misereWarn ? ' rr-bid--warn' : ''}`}>{bidDisplay}</span>
               <span className="rr-total">{score?.total ?? 0}</span>
             </div>
           );

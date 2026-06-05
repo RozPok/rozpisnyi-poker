@@ -2279,6 +2279,7 @@ body {
 }
 
 .opp-bid-tricks--exact { color: #86efac; opacity: 1; font-weight: 600; }
+.opp-bid-tricks--warn  { color: #f87171; opacity: 1; font-weight: 700; }
 
 .opp-cards {
   font-size: 0.5rem;
@@ -2405,6 +2406,7 @@ body {
 }
 
 .gs-me-tricks--exact { color: #86efac; opacity: 1; font-weight: 600; }
+.gs-me-tricks--warn  { color: #f87171; opacity: 1; font-weight: 700; }
 
 .gs-joker-badge {
   font-size: 0.62rem;
@@ -2932,6 +2934,7 @@ body {
 
 .rr-name  { flex: 1; font-size: 0.88rem; }
 .rr-bid   { font-size: 0.88rem; font-family: 'Courier New', monospace; min-width: 40px; text-align: center; }
+.rr-bid--warn { color: #f87171; font-weight: 700; }
 .rr-total { font-size: 0.88rem; font-weight: 700; color: var(--gold); min-width: 36px; text-align: right; }
 
 /* 5 ── Winner seat pulse */

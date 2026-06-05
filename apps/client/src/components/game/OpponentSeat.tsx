@@ -1,4 +1,4 @@
-import type { ActiveRound, PlayerScore, RoomPlayer } from '@rozpisnyi-poker/shared';
+import type { ActiveRound, PlayerScore, RoomPlayer, RoundType } from '@rozpisnyi-poker/shared';
 
 interface Props {
   player: RoomPlayer;
@@ -7,16 +7,38 @@ interface Props {
   isCurrentTurn: boolean;
   /** Brief winner-glow pulse after collecting a trick */
   isWinner?: boolean;
+  roundType?: RoundType;
 }
 
-export default function OpponentSeat({ player, score, ar, isCurrentTurn, isWinner = false }: Props) {
+export default function OpponentSeat({ player, score, ar, isCurrentTurn, isWinner = false, roundType }: Props) {
   const bid       = ar.bids[player.id];
   const tricks    = ar.tricksWon[player.id] ?? 0;
   const cardCount = ar.playerCardCounts[player.id] ?? 0;
   const total     = score?.total ?? 0;
   const hasBid    = player.id in ar.bids;
   const exact     = hasBid && tricks === bid;
+  const isDark    = ar.playerDarkFlags[player.id] ?? false;
+  const isMisere  = roundType === 'misere';
+  const isSpecial = roundType === 'misere' || roundType === 'golden';
+  const misereWarn = isMisere && tricks > 0;
   const isVacant  = player.isVacant === true;
+
+  let trickLabel: string;
+  if (hasBid) {
+    trickLabel = `${tricks}/${bid}${isDark ? 'Т' : ''}`;
+  } else if (ar.phase === 'playing' && isSpecial) {
+    trickLabel = String(tricks);
+  } else if (ar.phase === 'bidding') {
+    trickLabel = '…';
+  } else {
+    trickLabel = '—';
+  }
+
+  const trickClass = [
+    'opp-bid-tricks',
+    exact       ? 'opp-bid-tricks--exact' : '',
+    misereWarn  ? 'opp-bid-tricks--warn'  : '',
+  ].filter(Boolean).join(' ');
 
   if (isVacant) {
     return (
@@ -53,9 +75,7 @@ export default function OpponentSeat({ player, score, ar, isCurrentTurn, isWinne
       <span className="opp-total">{total}</span>
 
       {/* Tricks taken / bid */}
-      <span className={`opp-bid-tricks${exact ? ' opp-bid-tricks--exact' : ''}`}>
-        {hasBid ? `${tricks}/${bid}` : ar.phase === 'bidding' ? '…' : '—'}
-      </span>
+      <span className={trickClass}>{trickLabel}</span>
 
       {/* Cards remaining */}
       {cardCount > 0 && (

@@ -6,6 +6,7 @@ export interface BiddingEntry {
   name: string;
   bid: number | undefined;
   isCurrentBidder: boolean;
+  isDark: boolean;
 }
 
 interface Props {
@@ -40,7 +41,9 @@ export default function TableCenter({ plays, winnerId, players, biddingEntries }
             >
               <span className="bb-name">{entry.name}</span>
               <span className={`bb-bid${entry.bid === undefined ? ' bb-bid--pending' : ''}`}>
-                {entry.bid !== undefined ? entry.bid : '—'}
+                {entry.bid !== undefined
+                  ? `${entry.bid}${entry.isDark ? 'Т' : ''}`
+                  : '—'}
               </span>
             </div>
           ))}
