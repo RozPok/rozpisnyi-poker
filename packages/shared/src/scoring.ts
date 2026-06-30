@@ -17,7 +17,7 @@ export function computeScore(
     case 'no-trump':
       return scoreNormal(bid ?? 0, actualTricks);
     case 'dark':
-      return scoreNormal(bid ?? 0, actualTricks) * 2;
+      return scoreDark(bid ?? 0, actualTricks);
     case 'misere':
       return actualTricks === 0 ? 50 : -10 * actualTricks;
     case 'golden':
@@ -34,4 +34,13 @@ function scoreNormal(bid: number, actualTricks: number): number {
   if (actualTricks === bid) return 10 * bid;
   if (actualTricks > bid) return actualTricks;
   return -10 * (bid - actualTricks);
+}
+
+function scoreDark(bid: number, actualTricks: number): number {
+  // Undertrick: -20 per missing trick
+  if (actualTricks < bid) return -20 * (bid - actualTricks);
+  // Exact: 0T→+5; NT→20×N
+  if (actualTricks === bid) return bid === 0 ? 5 : bid * 20;
+  // Overtrick: score exactly as a normal round (no multiplier)
+  return scoreNormal(bid, actualTricks);
 }

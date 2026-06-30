@@ -281,8 +281,8 @@ describe('placeBid — last-player restriction', () => {
 // ─── placeBid — three-zero restriction ───────────────────────────────────────
 
 describe('placeBid — three-zero restriction', () => {
-  it('forbids bidding 0 when the previous two rounds were both 0', () => {
-    const room = makeRoomAtRound(3, 5, 2, { p1: [0, 0], p2: [1, 1], p3: [1, 1] });
+  it('forbids bidding 0 when the previous three rounds were all 0', () => {
+    const room = makeRoomAtRound(3, 5, 3, { p1: [0, 0, 0], p2: [1, 1, 1], p3: [1, 1, 1] });
     expect(placeBid(room, 'p1', 0)).toEqual({ ok: false, error: expect.any(String) });
   });
 
@@ -302,7 +302,7 @@ describe('placeBid — three-zero restriction', () => {
   });
 
   it('restriction applies only to the player with the zero streak, not others', () => {
-    const room = makeRoomAtRound(3, 5, 2, { p1: [0, 0], p2: [0, 0], p3: [1, 1] });
+    const room = makeRoomAtRound(3, 5, 3, { p1: [0, 0, 0], p2: [0, 0, 0], p3: [1, 1, 1] });
     // p1 cannot bid 0
     expect(placeBid(room, 'p1', 0)).toEqual({ ok: false, error: expect.any(String) });
     // p1 bids 1 to advance turn
@@ -336,9 +336,9 @@ describe('placeBid — three-zero restriction', () => {
 
 describe('placeBid — edge cases', () => {
   it('only one legal bid remains when both rules apply simultaneously', () => {
-    // cardsPerPlayer=2, history=[0,0] → zero-banned; total=1 → forbidden bid=1 (1+1=2)
+    // cardsPerPlayer=2, history=[0,0,0] → zero-banned; total=1 → forbidden bid=1 (1+1=2)
     // legal = [0,1,2] minus 0 (zero-ban) minus 1 (total rule) = [2]
-    const room = makeRoomAtRound(3, 2, 2, { p1: [1, 1], p2: [1, 1], p3: [0, 0] });
+    const room = makeRoomAtRound(3, 2, 3, { p1: [1, 1, 1], p2: [1, 1, 1], p3: [0, 0, 0] });
     placeBid(room, 'p1', 1);
     placeBid(room, 'p2', 0);
     // p3: forbidden by total → 1; forbidden by zero-ban → 0; only 2 remains
@@ -539,14 +539,14 @@ describe('finishRound — scoring', () => {
     expect(gs.scores.find(s => s.playerId === 'p3')!.total).toBe(2);
   });
 
-  it('applies dark-round ×2 multiplier', () => {
+  it('applies dark-round scoring correctly', () => {
     const room = makeRoomWithScores(3, 5, 'dark');
     forceComplete(room, { p1: 2, p2: 2, p3: 0 }, { p1: 2, p2: 0, p3: 3 });
     finishRound(room);
     const gs = room.gameSheet!;
-    expect(gs.scores.find(s => s.playerId === 'p1')!.scores[0]).toBe(40);   // 20×2
-    expect(gs.scores.find(s => s.playerId === 'p2')!.scores[0]).toBe(-40);  // -20×2
-    expect(gs.scores.find(s => s.playerId === 'p3')!.scores[0]).toBe(6);    // 3×2
+    expect(gs.scores.find(s => s.playerId === 'p1')!.scores[0]).toBe(40);   // bid=2 exact → 20×2
+    expect(gs.scores.find(s => s.playerId === 'p2')!.scores[0]).toBe(-40);  // bid=2 undertrick 2 → -20×2
+    expect(gs.scores.find(s => s.playerId === 'p3')!.scores[0]).toBe(3);    // bid=0 overtrick → +actual (no multiplier)
   });
 
   it('scores misere correctly (no bids)', () => {
@@ -1405,15 +1405,15 @@ describe('finishRound — dark bid scoring', () => {
     expect(gs.scores.find(s => s.playerId === 'p3')!.scores[0]).toBe(3);
   });
 
-  it('dark round type (Т) scores all players ×2 via computeScore (not playerDarkFlags)', () => {
+  it('dark round type (Т) uses computeScore dark rules (not playerDarkFlags)', () => {
     const room = makeRoomWithScores(3, 5, 'dark');
-    // p1: bid=2 actual=2 → +20 ×2 = +40 (from computeScore)
+    // p1: bid=2 exact → 20×2 = +40; p2: bid=2 undertrick 2 → -40; p3: bid=0 overtrick → +3 (no multiplier)
     forceComplete(room, { p1: 2, p2: 2, p3: 0 }, { p1: 2, p2: 0, p3: 3 });
     finishRound(room);
     const gs = room.gameSheet!;
     expect(gs.scores.find(s => s.playerId === 'p1')!.scores[0]).toBe(40);
     expect(gs.scores.find(s => s.playerId === 'p2')!.scores[0]).toBe(-40);
-    expect(gs.scores.find(s => s.playerId === 'p3')!.scores[0]).toBe(6);
+    expect(gs.scores.find(s => s.playerId === 'p3')!.scores[0]).toBe(3);
   });
 
   it('playerDarkFlags dark multiplier does not stack on top of dark round type ×2', () => {
