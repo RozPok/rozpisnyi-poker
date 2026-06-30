@@ -210,10 +210,10 @@ export function finishRound(room: GameRoom): FinishRoundResult {
   for (const ps of gameSheet.scores) {
     const bid = ar.bids[ps.playerId] ?? null;
     const actualTricks = ar.tricksWon[ps.playerId] ?? 0;
-    const base = computeScore(roundDef.type, bid, actualTricks);
-    // Per-player dark multiplier: only for normal rounds where the player chose dark
+    // If the player chose dark in a normal round, apply the same scoring as the dark round type.
     const playerWentDark = roundDef.type === 'normal' && (ar.playerDarkFlags[ps.playerId] ?? false);
-    const pts = playerWentDark ? base * 2 : base;
+    const scoreType = playerWentDark ? 'dark' : roundDef.type;
+    const pts = computeScore(scoreType, bid, actualTricks);
     scored[ps.playerId] = pts;
     ps.scores[ar.roundIndex] = pts;
     ps.total += pts;
