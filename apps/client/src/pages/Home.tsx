@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import type { GameRoom } from '@rozpisnyi-poker/shared';
+import type { GameRoom, LeaderboardEntry } from '@rozpisnyi-poker/shared';
 import { socket } from '../socket.ts';
 import { useServerStatus } from '../hooks/useServerStatus.ts';
 import ServerStatusBadge from '../components/ServerStatusBadge.tsx';
 
-type HomeView = 'menu' | 'create' | 'join';
+type HomeView = 'menu' | 'create' | 'join' | 'leaderboard';
 
 interface Props {
   onRoomJoined: (room: GameRoom, playerName: string) => void;
@@ -22,6 +22,7 @@ export default function Home({ onRoomJoined, onTestLab, restoreError, tgPlayerNa
   const [roomCode, setRoomCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
   const serverStatus = useServerStatus();
 
   function back() {
@@ -29,6 +30,12 @@ export default function Home({ onRoomJoined, onTestLab, restoreError, tgPlayerNa
     setError('');
     setPlayerName(tgPlayerName ?? '');
     setRoomCode('');
+  }
+
+  function openLeaderboard() {
+    setView('leaderboard');
+    setLeaderboard(null);
+    socket.emit('stats:get-leaderboard', entries => setLeaderboard(entries));
   }
 
   function handleCreate() {
@@ -135,6 +142,50 @@ export default function Home({ onRoomJoined, onTestLab, restoreError, tgPlayerNa
     );
   }
 
+  if (view === 'leaderboard') {
+    return (
+      <main className="screen">
+        <h1 className="title">Список підорасів</h1>
+        {leaderboard === null ? (
+          <p className="subtitle">Завантаження…</p>
+        ) : leaderboard.length === 0 ? (
+          <p className="subtitle lb-empty">Ще ніхто не завершив жодної гри.</p>
+        ) : (
+          <div className="lb-table-wrap">
+            <table className="lb-table">
+              <thead>
+                <tr>
+                  <th className="lb-rank">#</th>
+                  <th className="lb-name-col">Нік</th>
+                  <th>Ігор</th>
+                  <th>Перемог</th>
+                  <th>% перемог</th>
+                  <th className="lb-status-col">Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leaderboard.map((e, i) => (
+                  <tr key={e.playerId}>
+                    <td className="lb-rank">{i + 1}</td>
+                    <td className="lb-name-col">{e.name}</td>
+                    <td>{e.games}</td>
+                    <td>{e.wins}</td>
+                    <td>{Math.round(e.winRate)}%</td>
+                    <td className="lb-status-col">{e.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className="btn-col">
+          <button className="btn btn-secondary" onClick={back}>← Назад</button>
+        </div>
+        <ServerStatusBadge status={serverStatus} />
+      </main>
+    );
+  }
+
   return (
     <main className="screen">
       <h1 className="title">Розписний Покер</h1>
@@ -147,6 +198,9 @@ export default function Home({ onRoomJoined, onTestLab, restoreError, tgPlayerNa
         </button>
         <button className="btn btn-secondary" onClick={() => setView('join')}>
           Приєднатися до гри
+        </button>
+        <button className="btn btn-secondary" onClick={openLeaderboard}>
+          Список підорасів
         </button>
         <button className="btn btn-ghost" onClick={onTestLab}>
           Тест Лаб

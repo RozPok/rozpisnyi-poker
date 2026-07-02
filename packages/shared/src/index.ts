@@ -7,3 +7,4 @@ export * from './scoring.js';
 export * from './cardPlay.js';
 export * from './sortHand.js';
 export * from './canRevealHand.js';
+export * from './leaderboard.js';

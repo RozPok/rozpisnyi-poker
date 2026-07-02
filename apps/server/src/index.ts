@@ -8,6 +8,7 @@ import {
 import type { ClientToServerEvents, ServerToClientEvents } from '@rozpisnyi-poker/shared';
 import * as rooms from './rooms';
 import * as game from './game';
+import * as stats from './stats.js';
 import { scheduleBotAction } from './bots.js';
 
 const PORT          = process.env.PORT ?? 3001;
@@ -195,6 +196,11 @@ io.on('connection', socket => {
     callback({ ok: true, room: result });
   });
 
+  // ── stats:get-leaderboard ─────────────────────────────────────────────────────
+  socket.on('stats:get-leaderboard', callback => {
+    callback(stats.getLeaderboard());
+  });
+
   // ── game:start ──────────────────────────────────────────────────────────────
   socket.on('game:start', callback => {
     const room = rooms.getRoomByPlayerId(stableId);
@@ -243,6 +249,7 @@ io.on('connection', socket => {
 
     room.status = 'in-progress';
     room.gameSheet = sheet;
+    room.jokerCounts = {}; // fresh per-game Joker tracking
 
     const { handsMap, activeRound } = game.dealRound(room);
     room.activeRound = activeRound;
@@ -313,6 +320,9 @@ io.on('connection', socket => {
             }
           }
           scheduleBotAction(room, io);
+        } else {
+          // Game over — record global stats (no-op for Test Lab / bot-only games).
+          stats.recordGameResult(room);
         }
       }, TRICK_REVEAL_MS);
     } else {

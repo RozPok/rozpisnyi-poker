@@ -40,6 +40,7 @@ export function createRoom(ownerId: string, ownerName: string): GameRoom {
     activeRound: null,
     createdAt: Date.now(),
     mode: 'normal',
+    jokerCounts: {},
   };
   byId.set(room.id, room);
   byCode.set(code, room.id);
@@ -66,6 +67,7 @@ export function createTestRoom(
     mode: 'test',
     testRound,
     testPlayerCount: playerCount,
+    jokerCounts: {},
   };
   byId.set(room.id, room);
   byCode.set(code, room.id);

@@ -67,6 +67,16 @@ export function dealRound(room: GameRoom, _testDeck?: Card[]): DealResult {
   });
   handsByRoom.set(room.id, handsMap);
 
+  // Per-game Joker ("Жопа") tracking: increment the count for whichever player
+  // was dealt the Joker this round (it may land in the kitty — then no one gets it).
+  room.jokerCounts = room.jokerCounts ?? {};
+  for (const player of room.players) {
+    const hasJoker = (handsMap.get(player.id) ?? []).some(c => c.isJoker);
+    if (hasJoker) {
+      room.jokerCounts[player.id] = (room.jokerCounts[player.id] ?? 0) + 1;
+    }
+  }
+
   const starterIdx = getRoundStarterIndex(gameSheet.currentRoundIndex, room.players.length);
   const firstPlayerId = room.players[starterIdx]!.id;
 

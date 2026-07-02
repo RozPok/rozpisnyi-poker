@@ -66,6 +66,7 @@ export default function GameScreen({
   // UI state
   const [menuOpen,        setMenuOpen]        = useState(false);
   const [showScoreSheet,  setShowScoreSheet]  = useState(false);
+  const [showJokerList,   setShowJokerList]   = useState(false);
   const [showLastTrick,   setShowLastTrick]   = useState(false);
   const [hapticsOn,       setHapticsOn]       = useState(getHapticsEnabled);
   const [isDealing,       setIsDealing]       = useState(false);
@@ -340,6 +341,12 @@ export default function GameScreen({
             </button>
             <button
               className="gs-menu-item"
+              onClick={() => { setMenuOpen(false); setShowJokerList(true); }}
+            >
+              Список жоп
+            </button>
+            <button
+              className="gs-menu-item"
               onClick={() => {
                 const next = !hapticsOn;
                 setHapticsOn(next);
@@ -531,6 +538,15 @@ export default function GameScreen({
         />
       )}
 
+      {/* ── Joker list modal (current-game Joker counts) ─────────────────── */}
+      {showJokerList && (
+        <JokerListModal
+          players={room.players}
+          jokerCounts={room.jokerCounts}
+          onClose={() => setShowJokerList(false)}
+        />
+      )}
+
       {/* ── Round result panel ──────────────────────────────────────────── */}
       {showRoundResult && completedArSnapshot && (
         <RoundResultPanel ar={completedArSnapshot} gs={gs} myId={myId} players={room.players} />
@@ -691,6 +707,47 @@ function LastTrickModal({ trick, players, onClose }: LastTrickModalProps) {
           })}
         </div>
         <p className="last-trick-winner">Взяв: <strong>{winnerName}</strong></p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Joker list modal (current-game Joker counts) ─────────────────────────────
+
+interface JokerListModalProps {
+  players: GameRoom['players'];
+  jokerCounts?: Record<string, number>;
+  onClose: () => void;
+}
+
+function JokerListModal({ players, jokerCounts, onClose }: JokerListModalProps) {
+  return (
+    <div className="score-sheet-overlay" onClick={onClose}>
+      <div className="score-sheet-modal jl-modal" onClick={e => e.stopPropagation()}>
+        <div className="score-sheet-header">
+          <h2 className="score-sheet-title">Список жоп</h2>
+          <button className="btn btn-secondary score-sheet-close" onClick={onClose}>
+            Закрити
+          </button>
+        </div>
+        <div className="score-sheet-table-wrap">
+          <table className="jl-table">
+            <thead>
+              <tr>
+                <th className="jl-name-col">Нік</th>
+                <th>Жоп</th>
+              </tr>
+            </thead>
+            <tbody>
+              {players.map(p => (
+                <tr key={p.id}>
+                  <td className="jl-name-col">{p.name}</td>
+                  <td className="jl-count">{jokerCounts?.[p.id] ?? 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -205,6 +205,27 @@ export interface GameRoom {
   testRound?: { type: RoundType; cardsPerPlayer: number; label: string };
   /** Target total player count for test-mode rooms (including the human owner). */
   testPlayerCount?: number;
+  /**
+   * Per-game Joker ("Жопа") counts: playerId → number of deals this player held
+   * the Joker. Ephemeral — resets each game, never persisted to global stats.
+   */
+  jokerCounts?: Record<string, number>;
+}
+
+// ─── Player statistics (global leaderboard) ───────────────────────────────────
+
+/** One persisted player record, keyed by stable playerId / Telegram ID. */
+export interface PlayerStatRecord {
+  playerId: string;   // stable id (tg:<id> in Telegram, else browser UUID)
+  name: string;       // latest nickname used by this player
+  games: number;      // total completed normal games played
+  wins: number;       // total games won (ties count a win for all tied winners)
+}
+
+/** A leaderboard row: a PlayerStatRecord plus derived win rate and status. */
+export interface LeaderboardEntry extends PlayerStatRecord {
+  winRate: number;    // wins / games as a percentage (0–100, unrounded)
+  status: string;     // status label derived from winRate
 }
 
 // ─── Socket acknowledgement result ────────────────────────────────────────────
@@ -252,4 +273,5 @@ export interface ClientToServerEvents {
   ) => void;
   'testlab:add-bot': (callback: (result: RoomResult) => void) => void;
   'testlab:fill-bots': (callback: (result: RoomResult) => void) => void;
+  'stats:get-leaderboard': (callback: (entries: LeaderboardEntry[]) => void) => void;
 }
