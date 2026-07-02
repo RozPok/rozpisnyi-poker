@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { GameRoom, GameRound, RoomPlayer, RoundType } from '@rozpisnyi-poker/shared';
+import type { Card, GameRoom, GameRound, RoomPlayer, RoundType } from '@rozpisnyi-poker/shared';
 import { createDeck, getLegalCards } from '@rozpisnyi-poker/shared';
 import { dealRound, finishRound, getHand, getRoundStarterIndex, pickTrumpCard, placeBid, playCard } from '../game';
 
@@ -514,6 +514,113 @@ function forceComplete(
   ar.playerCardCounts = Object.fromEntries(Object.keys(tricksWon).map(id => [id, 0]));
   ar.isComplete = true;
 }
+
+/**
+ * Returns a full deck with the Joker moved to `index`. Since dealCards hands out
+ * contiguous blocks (player i gets deck[i*C .. i*C+C)), this pins which player —
+ * or the kitty — is dealt the Joker.
+ */
+function deckWithJokerAt(index: number): Card[] {
+  const deck = createDeck();
+  const jokerIdx = deck.findIndex(c => c.isJoker);
+  const [joker] = deck.splice(jokerIdx, 1);
+  deck.splice(index, 0, joker!);
+  return deck;
+}
+
+// ─── jokerCounts — per-game Joker ("Жопа") list tracking ─────────────────────
+
+describe('jokerCounts — per-game Joker tracking', () => {
+  it('records the Joker holder on the round but does NOT increment on deal', () => {
+    const room = makeRoomWithScores(3, 5, 'normal');
+    const { activeRound } = dealRound(room, deckWithJokerAt(0)); // p1 block = deck[0..5)
+    room.activeRound = activeRound;
+    expect(activeRound.jokerHolderPlayerId).toBe('p1');
+    expect(room.jokerCounts?.p1 ?? 0).toBe(0); // count stays 0 until the round finishes
+  });
+
+  it('increments jokerCounts for the holder only after finishRound', () => {
+    const room = makeRoomWithScores(3, 5, 'normal');
+    room.activeRound = dealRound(room, deckWithJokerAt(0)).activeRound;
+    expect(room.jokerCounts?.p1 ?? 0).toBe(0); // before finish
+
+    forceComplete(room, { p1: 1, p2: 1, p3: 1 }, { p1: 1, p2: 2, p3: 2 });
+    finishRound(room);
+
+    expect(room.jokerCounts?.p1).toBe(1); // after finish
+    expect(room.jokerCounts?.p2 ?? 0).toBe(0);
+    expect(room.jokerCounts?.p3 ?? 0).toBe(0);
+  });
+
+  it('credits the correct holder when a non-first player has the Joker', () => {
+    const room = makeRoomWithScores(3, 5, 'normal');
+    room.activeRound = dealRound(room, deckWithJokerAt(10)).activeRound; // p3 block = deck[10..15)
+    expect(room.activeRound.jokerHolderPlayerId).toBe('p3');
+    forceComplete(room, { p1: 1, p2: 1, p3: 1 }, { p1: 1, p2: 2, p3: 2 });
+    finishRound(room);
+    expect(room.jokerCounts).toEqual({ p3: 1 });
+  });
+
+  it('credits no one when the Joker lands in the kitty', () => {
+    const room = makeRoomWithScores(3, 5, 'normal');
+    room.activeRound = dealRound(room, deckWithJokerAt(15)).activeRound; // kitty = deck[15..33)
+    expect(room.activeRound.jokerHolderPlayerId).toBeNull();
+    forceComplete(room, { p1: 1, p2: 1, p3: 1 }, { p1: 1, p2: 2, p3: 2 });
+    finishRound(room);
+    expect(room.jokerCounts ?? {}).toEqual({});
+  });
+
+  it('Test Lab one-round game: 0 before finish, +1 to the holder after finish', () => {
+    const players: RoomPlayer[] = [
+      { id: 'human', name: 'Human',    isConnected: true },
+      { id: 'bot1',  name: '🤖 Бот 1', isConnected: true, isBot: true },
+      { id: 'bot2',  name: '🤖 Бот 2', isConnected: true, isBot: true },
+    ];
+    const room: GameRoom = {
+      id: 'tl-room', code: 'TLAB99', ownerId: 'human', players,
+      status: 'in-progress',
+      gameSheet: {
+        rounds: [{ index: 0, type: 'normal', cardsPerPlayer: 5, label: '5' }],
+        scores: players.map(p => ({ playerId: p.id, name: p.name, bids: [null], scores: [null], total: 0 })),
+        currentRoundIndex: 0,
+      },
+      activeRound: null, createdAt: Date.now(),
+      mode: 'test',
+      testRound: { type: 'normal', cardsPerPlayer: 5, label: '5' },
+      testPlayerCount: 3,
+      jokerCounts: {},
+    };
+    // Deal the Joker to bot1 (index 1 → block deck[5..10)).
+    room.activeRound = dealRound(room, deckWithJokerAt(5)).activeRound;
+    expect(room.activeRound.jokerHolderPlayerId).toBe('bot1');
+
+    // Before the round ends every count is 0 (this was the bug).
+    expect(room.jokerCounts).toEqual({});
+
+    forceComplete(room, { human: 1, bot1: 1, bot2: 1 }, { human: 1, bot1: 2, bot2: 2 });
+    finishRound(room);
+
+    // After the round ends the holder gets +1.
+    expect(room.jokerCounts).toEqual({ bot1: 1 });
+  });
+
+  it('accumulates Joker counts across rounds within one game', () => {
+    const room = makeRoomWithScores(3, 5, 'normal', [
+      { index: 1, type: 'normal', cardsPerPlayer: 5, label: '5' },
+    ]);
+    // Round 0 — Joker to p1.
+    room.activeRound = dealRound(room, deckWithJokerAt(0)).activeRound;
+    forceComplete(room, { p1: 1, p2: 1, p3: 1 }, { p1: 1, p2: 2, p3: 2 });
+    finishRound(room); // credits round 0, then deals round 1 with a random deck
+    expect(room.jokerCounts?.p1).toBe(1);
+
+    // Re-deal round 1 deterministically so p1 holds the Joker again.
+    room.activeRound = dealRound(room, deckWithJokerAt(0)).activeRound;
+    forceComplete(room, { p1: 1, p2: 1, p3: 1 }, { p1: 1, p2: 2, p3: 2 });
+    finishRound(room);
+    expect(room.jokerCounts?.p1).toBe(2);
+  });
+});
 
 // ─── finishRound ─────────────────────────────────────────────────────────────
 

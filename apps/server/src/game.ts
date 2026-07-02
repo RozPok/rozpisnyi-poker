@@ -67,15 +67,11 @@ export function dealRound(room: GameRoom, _testDeck?: Card[]): DealResult {
   });
   handsByRoom.set(room.id, handsMap);
 
-  // Per-game Joker ("Жопа") tracking: increment the count for whichever player
-  // was dealt the Joker this round (it may land in the kitty — then no one gets it).
-  room.jokerCounts = room.jokerCounts ?? {};
-  for (const player of room.players) {
-    const hasJoker = (handsMap.get(player.id) ?? []).some(c => c.isJoker);
-    if (hasJoker) {
-      room.jokerCounts[player.id] = (room.jokerCounts[player.id] ?? 0) + 1;
-    }
-  }
+  // Per-game Joker ("Жопа") tracking: record who was dealt the Joker this round
+  // (it may land in the kitty — then no one holds it). The count is NOT bumped
+  // here; finishRound credits the holder once the round actually completes.
+  const jokerHolderPlayerId =
+    room.players.find(p => (handsMap.get(p.id) ?? []).some(c => c.isJoker))?.id ?? null;
 
   const starterIdx = getRoundStarterIndex(gameSheet.currentRoundIndex, room.players.length);
   const firstPlayerId = room.players[starterIdx]!.id;
@@ -108,6 +104,7 @@ export function dealRound(room: GameRoom, _testDeck?: Card[]): DealResult {
     tricksWon: Object.fromEntries(room.players.map(p => [p.id, 0])),
     playerCardCounts: Object.fromEntries(room.players.map(p => [p.id, roundDef.cardsPerPlayer])),
     playerDarkFlags: {},
+    jokerHolderPlayerId,
     isComplete: false,
     lastTrick: null,
   };
@@ -214,6 +211,14 @@ export function finishRound(room: GameRoom): FinishRoundResult {
 
   const roundDef = gameSheet.rounds[ar.roundIndex];
   if (!roundDef) throw new Error('Round definition not found');
+
+  // Per-game Joker ("Жопа") tracking: now that the round is complete, credit the
+  // player who held the Joker this round. Ephemeral — never persisted globally.
+  if (ar.jokerHolderPlayerId) {
+    room.jokerCounts = room.jokerCounts ?? {};
+    room.jokerCounts[ar.jokerHolderPlayerId] =
+      (room.jokerCounts[ar.jokerHolderPlayerId] ?? 0) + 1;
+  }
 
   // Compute and persist scores for every player
   const scored: Record<string, number> = {};

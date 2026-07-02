@@ -45,6 +45,20 @@ function makeInProgressRoom(playerIds: string[]): GameRoom {
   return room;
 }
 
+// ─── jokerCounts initialization (new game reset) ──────────────────────────────
+
+describe('jokerCounts initialization', () => {
+  it('createRoom starts a new game with empty jokerCounts', () => {
+    const room = rooms.createRoom('p1', 'Alice');
+    expect(room.jokerCounts).toEqual({});
+  });
+
+  it('createTestRoom starts a new game with empty jokerCounts', () => {
+    const room = rooms.createTestRoom('p1', 'Alice', 4, { type: 'normal', cardsPerPlayer: 8, label: '8' });
+    expect(room.jokerCounts).toEqual({});
+  });
+});
+
 // ─── reconnectPlayer ─────────────────────────────────────────────────────────
 
 describe('reconnectPlayer', () => {

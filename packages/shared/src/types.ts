@@ -132,6 +132,7 @@ export interface ActiveRound {
   tricksWon: Record<string, number>;   // playerId → tricks won this round
   playerCardCounts: Record<string, number>; // playerId → cards still in hand (public)
   playerDarkFlags: Record<string, boolean>; // playerId → chose dark bid this round (normal rounds)
+  jokerHolderPlayerId: string | null;  // player dealt the Joker this round (null if it went to the kitty)
   isComplete: boolean;                 // true when all cards have been played
   lastTrick: LastTrick | null;         // snapshot of the most recently completed trick
 }
