@@ -1,57 +1,95 @@
 import type { LeaderboardEntry, PlayerStatRecord } from './types.js';
 
 /**
- * Maps a win rate (percentage, 0–100) to a status label.
- *
- * Bands are lower-bound inclusive: exactly 90% → top band, exactly 10% → Чмо.
- * The mapping applies immediately, even for a player with a single game.
+ * Status bands for players with at least one win, best → worst.
+ * `Лох` (10th status) is intentionally excluded here — it is reserved for
+ * players with zero wins and is applied separately.
  */
-export function winRateStatus(winRatePercent: number): string {
-  if (winRatePercent >= 90) return 'Злоєбучій Підорас';
-  if (winRatePercent >= 80) return 'Хуєсос';
-  if (winRatePercent >= 70) return 'Уєбан';
-  if (winRatePercent >= 60) return 'Гніда';
-  if (winRatePercent >= 50) return 'Блядота';
-  if (winRatePercent >= 40) return 'Гандон';
-  if (winRatePercent >= 30) return 'Хуйло';
-  if (winRatePercent >= 20) return 'Блядун';
-  if (winRatePercent >= 10) return 'Чмо';
-  return 'Лох';
+export const WINNING_STATUSES = [
+  'Злоєбучій Підорас', // best
+  'Хуєсос',
+  'Уєбан',
+  'Гніда',
+  'Блядота',
+  'Гандон',
+  'Хуйло',
+  'Блядун',
+  'Чмо',               // lowest status a winning player can hold
+] as const;
+
+/** Status for players with zero wins — always the lowest. */
+export const STATUS_LOSER = 'Лох';
+
+/**
+ * Maps a winning player's rank to a status band.
+ *
+ * @param rank        0-based position among winning players (0 = best)
+ * @param winnerCount total number of winning players
+ *
+ * band = winnerCount <= 1 ? 0 : round(rank * 8 / (winnerCount - 1))
+ *
+ * so the best winner always gets the top band, the worst winning player always
+ * gets `Чмо`, and everyone in between is spread proportionally across the 9
+ * winning bands (bands are shared when there are more winners than bands).
+ */
+export function statusForWinnerRank(rank: number, winnerCount: number): string {
+  if (winnerCount <= 1) return WINNING_STATUSES[0];
+  const lastBand = WINNING_STATUSES.length - 1; // 8
+  const band = Math.round((rank * lastBand) / (winnerCount - 1));
+  return WINNING_STATUSES[band] ?? WINNING_STATUSES[lastBand];
+}
+
+/** Hidden rating points for a record (defensive fallback to the migration formula). */
+function pointsOf(r: PlayerStatRecord): number {
+  return typeof r.points === 'number' ? r.points : r.games + r.wins * 5;
 }
 
 /**
- * Builds a sorted leaderboard from raw player records.
+ * Builds the ranked leaderboard from raw player records.
  *
- * Sort order:
- *   1. win rate descending
- *   2. games played descending
- *   3. wins descending
+ * Ranking (and display order):
+ *   1. hidden points descending
+ *   2. wins descending
+ *   3. games descending
  *   4. nickname alphabetically (Ukrainian locale)
  *
- * Records with zero games are excluded (they cannot have a meaningful win rate).
+ * Status is assigned by ranking position among winning players (see
+ * statusForWinnerRank); players with zero wins always get `Лох`. Win rate is
+ * still computed for display but does NOT affect ranking or status.
+ *
+ * Records with zero games are excluded. Points are never included in the output.
  */
 export function buildLeaderboard(records: PlayerStatRecord[]): LeaderboardEntry[] {
-  const entries: LeaderboardEntry[] = records
+  const sorted = records
     .filter(r => r.games > 0)
-    .map(r => {
-      const winRate = (r.wins / r.games) * 100;
-      return {
-        playerId: r.playerId,
-        name: r.name,
-        games: r.games,
-        wins: r.wins,
-        winRate,
-        status: winRateStatus(winRate),
-      };
-    });
+    .map(r => ({
+      playerId: r.playerId,
+      name: r.name,
+      games: r.games,
+      wins: r.wins,
+      points: pointsOf(r),
+      winRate: (r.wins / r.games) * 100,
+    }))
+    .sort(
+      (a, b) =>
+        b.points - a.points ||
+        b.wins - a.wins ||
+        b.games - a.games ||
+        a.name.localeCompare(b.name, 'uk'),
+    );
 
-  entries.sort(
-    (a, b) =>
-      b.winRate - a.winRate ||
-      b.games - a.games ||
-      b.wins - a.wins ||
-      a.name.localeCompare(b.name, 'uk'),
-  );
+  const winnerCount = sorted.filter(e => e.wins > 0).length;
+  let winnerRank = 0;
 
-  return entries;
+  return sorted.map(e => {
+    const status = e.wins > 0 ? statusForWinnerRank(winnerRank++, winnerCount) : STATUS_LOSER;
+    return {
+      playerId: e.playerId,
+      name: e.name,
+      games: e.games,
+      wins: e.wins,
+      winRate: e.winRate,
+      status,
+    };
+  });
 }

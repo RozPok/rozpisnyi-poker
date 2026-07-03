@@ -17,17 +17,24 @@ function load(): Map<string, PlayerStatRecord> {
   if (records) return records;
 
   const map = new Map<string, PlayerStatRecord>();
+  let migrated = false;
   try {
     if (existsSync(statsFile)) {
       const raw = readFileSync(statsFile, 'utf8');
-      const parsed = JSON.parse(raw) as Record<string, PlayerStatRecord>;
+      const parsed = JSON.parse(raw) as Record<string, Partial<PlayerStatRecord>>;
       for (const rec of Object.values(parsed)) {
         if (rec && typeof rec.playerId === 'string') {
+          const games = rec.games ?? 0;
+          const wins = rec.wins ?? 0;
+          // Legacy files predate `points` — recompute (games + wins*5) and flag for re-persist.
+          const hasPoints = typeof rec.points === 'number';
+          if (!hasPoints) migrated = true;
           map.set(rec.playerId, {
             playerId: rec.playerId,
             name: rec.name ?? rec.playerId,
-            games: rec.games ?? 0,
-            wins: rec.wins ?? 0,
+            games,
+            wins,
+            points: hasPoints ? rec.points! : games + wins * 5,
           });
         }
       }
@@ -37,6 +44,8 @@ function load(): Map<string, PlayerStatRecord> {
   }
 
   records = map;
+  // Persist migrated points once so legacy files are upgraded on disk (safe atomic write).
+  if (migrated) persist(map);
   return map;
 }
 
@@ -87,8 +96,9 @@ export function computeWinnerIds(room: GameRoom): string[] {
  * Record the result of a completed game.
  *
  * No-op for Test Lab (mode !== 'normal') games. Bots are never counted. Every
- * real player gets games+1; each winner (all tied winners) gets wins+1. Each
- * player's stored nickname is refreshed to their current name.
+ * real player gets games+1 and points+1; each winner (all tied winners) also
+ * gets wins+1 and points+5 (net +6). The stored nickname is refreshed to the
+ * player's current name.
  */
 export function recordGameResult(room: GameRoom): void {
   if (room.mode !== 'normal') return;
@@ -102,10 +112,14 @@ export function recordGameResult(room: GameRoom): void {
 
   for (const p of real) {
     const existing = map.get(p.id);
-    const rec: PlayerStatRecord = existing ?? { playerId: p.id, name: p.name, games: 0, wins: 0 };
+    const rec: PlayerStatRecord = existing ?? { playerId: p.id, name: p.name, games: 0, wins: 0, points: 0 };
     rec.name = p.name; // refresh to latest nickname
     rec.games += 1;
-    if (winnerIds.has(p.id)) rec.wins += 1;
+    rec.points += 1;   // participation
+    if (winnerIds.has(p.id)) {
+      rec.wins += 1;
+      rec.points += 5; // winning bonus (net +6 for winners)
+    }
     map.set(p.id, rec);
   }
 

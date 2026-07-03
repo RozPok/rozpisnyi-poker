@@ -221,12 +221,20 @@ export interface PlayerStatRecord {
   name: string;       // latest nickname used by this player
   games: number;      // total completed normal games played
   wins: number;       // total games won (ties count a win for all tied winners)
+  points: number;     // hidden rating: +1 per game, +5 per win (== games + wins*5)
 }
 
-/** A leaderboard row: a PlayerStatRecord plus derived win rate and status. */
-export interface LeaderboardEntry extends PlayerStatRecord {
-  winRate: number;    // wins / games as a percentage (0–100, unrounded)
-  status: string;     // status label derived from winRate
+/**
+ * A leaderboard row. Note: `points` is intentionally NOT included — the hidden
+ * rating drives ranking/status server-side but must never reach the UI.
+ */
+export interface LeaderboardEntry {
+  playerId: string;
+  name: string;
+  games: number;
+  wins: number;
+  winRate: number;    // wins / games as a percentage (0–100, unrounded) — displayed only
+  status: string;     // status label derived from ranking position (see leaderboard.ts)
 }
 
 // ─── Socket acknowledgement result ────────────────────────────────────────────
