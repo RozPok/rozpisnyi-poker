@@ -13,7 +13,7 @@ export const WINNING_STATUSES = [
   'Блядота',
   'Гандон',
   'Хуйло',
-  'Блядун',
+  'Мразь',
   'Чмо',               // lowest status a winning player can hold
 ] as const;
 
@@ -39,9 +39,9 @@ export function statusForWinnerRank(rank: number, winnerCount: number): string {
   return WINNING_STATUSES[band] ?? WINNING_STATUSES[lastBand];
 }
 
-/** Hidden rating points for a record (defensive fallback to the migration formula). */
+/** Hidden rating points for a record (defensively treats a missing value as 0). */
 function pointsOf(r: PlayerStatRecord): number {
-  return typeof r.points === 'number' ? r.points : r.games + r.wins * 5;
+  return typeof r.points === 'number' ? r.points : 0;
 }
 
 /**

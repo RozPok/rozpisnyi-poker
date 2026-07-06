@@ -355,6 +355,9 @@ io.on('connection', socket => {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
+// Load stats (and reset the leaderboard if the on-disk file predates this version).
+stats.init();
+
 httpServer.listen(PORT, () => {
   console.log(`Server  http://localhost:${PORT}`);
 });
