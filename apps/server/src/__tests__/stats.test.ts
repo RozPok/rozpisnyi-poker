@@ -66,12 +66,12 @@ function readStored(): Record<string, { games: number; wins: number; points: num
 // ─── placementPointsFor (pure table) ─────────────────────────────────────────
 
 describe('placementPointsFor', () => {
-  it('3 players', () => expect([1, 2, 3].map(p => placementPointsFor(3, p))).toEqual([6, 0, -2]));
-  it('4 players', () => expect([1, 2, 3, 4].map(p => placementPointsFor(4, p))).toEqual([8, 3, 0, -2]));
-  it('5 players', () => expect([1, 2, 3, 4, 5].map(p => placementPointsFor(5, p))).toEqual([10, 6, 2, 0, -3]));
-  it('6 players', () => expect([1, 2, 3, 4, 5, 6].map(p => placementPointsFor(6, p))).toEqual([12, 8, 5, 2, 0, -3]));
-  it('7 players', () => expect([1, 2, 3, 4, 5, 6, 7].map(p => placementPointsFor(7, p))).toEqual([14, 10, 7, 4, 2, 0, -4]));
-  it('8 players', () => expect([1, 2, 3, 4, 5, 6, 7, 8].map(p => placementPointsFor(8, p))).toEqual([16, 12, 9, 6, 3, 2, 0, -4]));
+  it('3 players', () => expect([1, 2, 3].map(p => placementPointsFor(3, p))).toEqual([2, 1, -1]));
+  it('4 players', () => expect([1, 2, 3, 4].map(p => placementPointsFor(4, p))).toEqual([2, 1, -1, -2]));
+  it('5 players', () => expect([1, 2, 3, 4, 5].map(p => placementPointsFor(5, p))).toEqual([3, 2, 1, -1, -2]));
+  it('6 players', () => expect([1, 2, 3, 4, 5, 6].map(p => placementPointsFor(6, p))).toEqual([3, 2, 1, -1, -2, -3]));
+  it('7 players', () => expect([1, 2, 3, 4, 5, 6, 7].map(p => placementPointsFor(7, p))).toEqual([4, 3, 2, 1, -1, -2, -3]));
+  it('8 players', () => expect([1, 2, 3, 4, 5, 6, 7, 8].map(p => placementPointsFor(8, p))).toEqual([4, 3, 2, 1, -1, -2, -3, -4]));
 
   it('returns 0 for out-of-range player counts or placements', () => {
     expect(placementPointsFor(2, 1)).toBe(0);
@@ -104,15 +104,15 @@ describe('recordGameResult — placement points per player count', () => {
   it('3 players (no ties)', () => {
     recordGameResult(roomOf([30, 20, 10]));
     const s = readStored();
-    expect(s.p1).toMatchObject({ games: 1, wins: 1, points: 6 });
-    expect(s.p2).toMatchObject({ games: 1, wins: 0, points: 0 });
-    expect(s.p3).toMatchObject({ games: 1, wins: 0, points: -2 });
+    expect(s.p1).toMatchObject({ games: 1, wins: 1, points: 2 });
+    expect(s.p2).toMatchObject({ games: 1, wins: 0, points: 1 });
+    expect(s.p3).toMatchObject({ games: 1, wins: 0, points: -1 });
   });
 
   it('4 players (no ties)', () => {
     recordGameResult(roomOf([40, 30, 20, 10]));
     const s = readStored();
-    expect([s.p1.points, s.p2.points, s.p3.points, s.p4.points]).toEqual([8, 3, 0, -2]);
+    expect([s.p1.points, s.p2.points, s.p3.points, s.p4.points]).toEqual([2, 1, -1, -2]);
     expect(s.p1.wins).toBe(1);
     expect(s.p4.wins).toBe(0);
   });
@@ -120,26 +120,26 @@ describe('recordGameResult — placement points per player count', () => {
   it('5 players (no ties)', () => {
     recordGameResult(roomOf([50, 40, 30, 20, 10]));
     const s = readStored();
-    expect([s.p1, s.p2, s.p3, s.p4, s.p5].map(r => r.points)).toEqual([10, 6, 2, 0, -3]);
+    expect([s.p1, s.p2, s.p3, s.p4, s.p5].map(r => r.points)).toEqual([3, 2, 1, -1, -2]);
   });
 
   it('6 players (no ties)', () => {
     recordGameResult(roomOf([60, 50, 40, 30, 20, 10]));
     const s = readStored();
-    expect([s.p1, s.p2, s.p3, s.p4, s.p5, s.p6].map(r => r.points)).toEqual([12, 8, 5, 2, 0, -3]);
+    expect([s.p1, s.p2, s.p3, s.p4, s.p5, s.p6].map(r => r.points)).toEqual([3, 2, 1, -1, -2, -3]);
   });
 
   it('7 players (no ties)', () => {
     recordGameResult(roomOf([70, 60, 50, 40, 30, 20, 10]));
     const s = readStored();
-    expect([s.p1, s.p2, s.p3, s.p4, s.p5, s.p6, s.p7].map(r => r.points)).toEqual([14, 10, 7, 4, 2, 0, -4]);
+    expect([s.p1, s.p2, s.p3, s.p4, s.p5, s.p6, s.p7].map(r => r.points)).toEqual([4, 3, 2, 1, -1, -2, -3]);
   });
 
   it('8 players (no ties)', () => {
     recordGameResult(roomOf([80, 70, 60, 50, 40, 30, 20, 10]));
     const s = readStored();
     expect([s.p1, s.p2, s.p3, s.p4, s.p5, s.p6, s.p7, s.p8].map(r => r.points))
-      .toEqual([16, 12, 9, 6, 3, 2, 0, -4]);
+      .toEqual([4, 3, 2, 1, -1, -2, -3, -4]);
     expect(s.p1.wins).toBe(1);
     expect(s.p8.wins).toBe(0);
   });
@@ -151,32 +151,40 @@ describe('recordGameResult — ties', () => {
   it('tied for first: both get 1st points and a win', () => {
     recordGameResult(roomOf([30, 30, 10])); // p1 & p2 tie 1st; p3 is 3rd (two above)
     const s = readStored();
-    expect(s.p1).toMatchObject({ points: 6, wins: 1 });
-    expect(s.p2).toMatchObject({ points: 6, wins: 1 });
-    expect(s.p3).toMatchObject({ points: -2, wins: 0 });
+    expect(s.p1).toMatchObject({ points: 2, wins: 1 });
+    expect(s.p2).toMatchObject({ points: 2, wins: 1 });
+    expect(s.p3).toMatchObject({ points: -1, wins: 0 });
   });
 
   it('tie in the middle (4p): shared placement, following placement skipped', () => {
     recordGameResult(roomOf([40, 20, 20, 10])); // p1 1st, p2&p3 2nd, p4 4th
     const s = readStored();
-    expect(s.p1.points).toBe(8);
-    expect(s.p2.points).toBe(3); // 2nd
-    expect(s.p3.points).toBe(3); // 2nd
+    expect(s.p1.points).toBe(2);
+    expect(s.p2.points).toBe(1); // 2nd
+    expect(s.p3.points).toBe(1); // 2nd
     expect(s.p4.points).toBe(-2); // 4th (three above)
+  });
+
+  it('matches the spec example (4p: 100, 80, 80, 50 → +2, +1, +1, -2)', () => {
+    recordGameResult(roomOf([100, 80, 80, 50]));
+    const s = readStored();
+    expect([s.p1.points, s.p2.points, s.p3.points, s.p4.points]).toEqual([2, 1, 1, -2]);
+    expect(s.p1.wins).toBe(1);
+    expect(s.p2.wins).toBe(0);
   });
 
   it('all tied (3p): everyone is 1st and gets a win', () => {
     recordGameResult(roomOf([10, 10, 10]));
     const s = readStored();
-    for (const id of ['p1', 'p2', 'p3']) expect(s[id]).toMatchObject({ points: 6, wins: 1 });
+    for (const id of ['p1', 'p2', 'p3']) expect(s[id]).toMatchObject({ points: 2, wins: 1 });
   });
 
   it('tie for last (3p): both share 2nd, last-place penalty not applied', () => {
     recordGameResult(roomOf([30, 10, 10])); // p1 1st; p2 & p3 tie 2nd
     const s = readStored();
-    expect(s.p1.points).toBe(6);
-    expect(s.p2.points).toBe(0); // 2nd, NOT -2
-    expect(s.p3.points).toBe(0);
+    expect(s.p1.points).toBe(2);
+    expect(s.p2.points).toBe(1); // 2nd, NOT -1
+    expect(s.p3.points).toBe(1);
     expect(s.p2.wins).toBe(0);
   });
 });
@@ -187,14 +195,14 @@ describe('recordGameResult — last-place penalty', () => {
   it('applies the negative penalty only to the strictly last player', () => {
     recordGameResult(roomOf([50, 40, 30, 20, 10])); // 5p
     const s = readStored();
-    expect(s.p5.points).toBe(-3); // 5th
-    expect(s.p4.points).toBe(0);  // 4th (no penalty)
+    expect(s.p5.points).toBe(-2); // 5th
+    expect(s.p4.points).toBe(-1); // 4th
   });
 
   it('accumulates negative points across games', () => {
-    recordGameResult(roomOf([30, 20, 10])); // p3 last → -2
-    recordGameResult(roomOf([30, 20, 10])); // p3 last → -2
-    expect(readStored().p3.points).toBe(-4);
+    recordGameResult(roomOf([30, 20, 10])); // p3 last → -1
+    recordGameResult(roomOf([30, 20, 10])); // p3 last → -1
+    expect(readStored().p3.points).toBe(-2);
   });
 });
 
@@ -206,8 +214,8 @@ describe('getLeaderboard', () => {
   });
 
   it('sorts by accumulated placement points descending', () => {
-    recordGameResult(roomOf([30, 20, 10])); // p1 +6, p2 0, p3 -2
-    recordGameResult(roomOf([30, 20, 10])); // p1 +6, p2 0, p3 -2
+    recordGameResult(roomOf([30, 20, 10])); // p1 +2, p2 +1, p3 -1
+    recordGameResult(roomOf([30, 20, 10])); // p1 +2, p2 +1, p3 -1
     const lb = getLeaderboard();
     expect(lb.map(e => e.playerId)).toEqual(['p1', 'p2', 'p3']);
     expect(lb.find(e => e.playerId === 'p1')!.status).toBe('Злоєбучій Підорас');
@@ -248,10 +256,10 @@ describe('exclusions', () => {
     recordGameResult(finishedRoom({ a: 30, b: 20, c: 10, bot: 99 }, players));
     const s = readStored();
     expect(Object.keys(s).sort()).toEqual(['a', 'b', 'c']);
-    // 3 real players → 3-player table: a 1st (+6), b 2nd (0), c 3rd (-2).
-    expect(s.a.points).toBe(6);
-    expect(s.b.points).toBe(0);
-    expect(s.c.points).toBe(-2);
+    // 3 real players → 3-player table: a 1st (+2), b 2nd (+1), c 3rd (-1).
+    expect(s.a.points).toBe(2);
+    expect(s.b.points).toBe(1);
+    expect(s.c.points).toBe(-1);
     expect(getLeaderboard().some(e => e.playerId === 'bot')).toBe(false);
   });
 });
@@ -279,13 +287,51 @@ describe('reset & persistence', () => {
     expect(parsed.players).toEqual({});
   });
 
-  it('wipes a file whose version does not match', () => {
+  it('wipes a file whose version is too old / unknown', () => {
     writeFileSync(file, JSON.stringify({
-      version: RATING_VERSION - 1,
+      version: 1, // predates the migratable version → full reset
       players: { x: { playerId: 'x', name: 'X', games: 1, wins: 1, points: 8 } },
     }), 'utf8');
     _setStatsFileForTest(file);
     expect(getLeaderboard()).toEqual([]);
+  });
+
+  it('migrates a version-2 file: resets points to 0, preserves games/wins', () => {
+    writeFileSync(file, JSON.stringify({
+      version: 2,
+      players: {
+        alice: { playerId: 'alice', name: 'Alice', games: 10, wins: 4, points: 37 },
+        bob: { playerId: 'bob', name: 'Bob', games: 6, wins: 0, points: -5 },
+      },
+    }), 'utf8');
+    _setStatsFileForTest(file); // drop cache → triggers load + migration
+
+    const lb = getLeaderboard();
+    // games/wins/win% preserved; ranking falls to wins→games→name with points all 0.
+    expect(lb.map(e => e.playerId)).toEqual(['alice', 'bob']);
+    const alice = lb.find(e => e.playerId === 'alice')!;
+    expect(alice).toMatchObject({ games: 10, wins: 4, winRate: 40 });
+    expect(alice.status).toBe('Злоєбучій Підорас'); // only winner
+    expect(lb.find(e => e.playerId === 'bob')!.status).toBe('Лох'); // 0 wins
+
+    // Upgraded on disk to the current version with points zeroed.
+    const parsed = JSON.parse(readFileSync(file, 'utf8'));
+    expect(parsed.version).toBe(RATING_VERSION);
+    expect(parsed.players.alice).toMatchObject({ games: 10, wins: 4, points: 0 });
+    expect(parsed.players.bob).toMatchObject({ games: 6, wins: 0, points: 0 });
+  });
+
+  it('accrues new points from 0 after a v2 migration', () => {
+    writeFileSync(file, JSON.stringify({
+      version: 2,
+      players: { p1: { playerId: 'p1', name: 'P1', games: 5, wins: 2, points: 20 } },
+    }), 'utf8');
+    _setStatsFileForTest(file);
+    getLeaderboard(); // migrate → p1 points 0, games 5, wins 2
+
+    recordGameResult(roomOf([30, 20, 10])); // p1 finishes 1st → +2
+    const s = readStored();
+    expect(s.p1).toMatchObject({ games: 6, wins: 3, points: 2 }); // 0 + 2
   });
 
   it('loads and persists across a restart at the current version', () => {
@@ -297,13 +343,13 @@ describe('reset & persistence', () => {
 
     const parsed = JSON.parse(readFileSync(file, 'utf8'));
     expect(parsed.version).toBe(RATING_VERSION);
-    expect(parsed.players.p1).toMatchObject({ playerId: 'p1', games: 1, wins: 1, points: 6 });
+    expect(parsed.players.p1).toMatchObject({ playerId: 'p1', games: 1, wins: 1, points: 2 });
   });
 
   it('writes the versioned file format', () => {
     recordGameResult(roomOf([30, 20, 10]));
     const parsed = JSON.parse(readFileSync(file, 'utf8'));
     expect(parsed).toHaveProperty('version', RATING_VERSION);
-    expect(parsed.players.p1).toMatchObject({ playerId: 'p1', points: 6 });
+    expect(parsed.players.p1).toMatchObject({ playerId: 'p1', points: 2 });
   });
 });

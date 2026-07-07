@@ -10,11 +10,20 @@ let statsFile = process.env.PLAYER_STATS_FILE ?? DEFAULT_STATS_FILE;
 
 /**
  * Rating schema version. Bumped whenever the rating rules change in a way that
- * invalidates stored data. On load, any file whose version does not match is
- * discarded (a full reset, no migration) and an empty file is written in the
- * current format — so the first startup after deployment starts everyone at zero.
+ * invalidates stored points.
+ *
+ * On load:
+ *   - version === RATING_VERSION        → loaded as-is.
+ *   - version === POINTS_RESET_VERSION  → migrated: games/wins preserved, points
+ *     reset to 0. The placement table changed and, with no stored game history,
+ *     historical points cannot be recalculated, so they are zeroed rather than
+ *     fabricated. Win % (derived from games/wins) is unaffected.
+ *   - anything older / unversioned      → full reset.
  */
-export const RATING_VERSION = 2;
+export const RATING_VERSION = 3;
+
+/** Previous version whose points are reset (games/wins preserved) on load. */
+const POINTS_RESET_VERSION = 2;
 
 interface StatsFile {
   version: number;
@@ -31,12 +40,12 @@ let records: Map<string, PlayerStatRecord> | null = null;
  * number of real players in the game. Index 0 = 1st place … last = last place.
  */
 export const PLACEMENT_POINTS: Record<number, readonly number[]> = {
-  3: [6, 0, -2],
-  4: [8, 3, 0, -2],
-  5: [10, 6, 2, 0, -3],
-  6: [12, 8, 5, 2, 0, -3],
-  7: [14, 10, 7, 4, 2, 0, -4],
-  8: [16, 12, 9, 6, 3, 2, 0, -4],
+  3: [2, 1, -1],
+  4: [2, 1, -1, -2],
+  5: [3, 2, 1, -1, -2],
+  6: [3, 2, 1, -1, -2, -3],
+  7: [4, 3, 2, 1, -1, -2, -3],
+  8: [4, 3, 2, 1, -1, -2, -3, -4],
 };
 
 /** Points for `placement` (1-based) at a table of `playerCount`; 0 if out of range. */
@@ -50,11 +59,15 @@ function load(): Map<string, PlayerStatRecord> {
   if (records) return records;
 
   const map = new Map<string, PlayerStatRecord>();
-  let staleFile = false; // file present but wrong/absent version → reset it
+  let needsPersist = false; // rewrite the file after a reset or points migration
   try {
     if (existsSync(statsFile)) {
       const parsed = JSON.parse(readFileSync(statsFile, 'utf8')) as Partial<StatsFile>;
-      if (parsed && parsed.version === RATING_VERSION && parsed.players) {
+      const version = parsed?.version;
+      if (parsed && parsed.players && (version === RATING_VERSION || version === POINTS_RESET_VERSION)) {
+        // v2 → v3: placement table changed and points can't be recalculated from
+        // aggregate stats, so keep games/wins but reset points to 0.
+        const resetPoints = version === POINTS_RESET_VERSION;
         for (const rec of Object.values(parsed.players)) {
           if (rec && typeof rec.playerId === 'string') {
             map.set(rec.playerId, {
@@ -62,23 +75,24 @@ function load(): Map<string, PlayerStatRecord> {
               name: rec.name ?? rec.playerId,
               games: rec.games ?? 0,
               wins: rec.wins ?? 0,
-              points: rec.points ?? 0,
+              points: resetPoints ? 0 : (rec.points ?? 0),
             });
           }
         }
+        if (resetPoints) needsPersist = true; // persist the upgraded (v3) file
       } else {
-        // Old or unknown format → complete reset (do NOT migrate old data).
-        staleFile = true;
+        // Older / unknown / unversioned format → complete reset (no migration).
+        needsPersist = true;
       }
     }
   } catch {
     // Corrupt or unreadable file → start empty so games keep working.
-    staleFile = true;
+    needsPersist = true;
   }
 
   records = map;
-  // Recreate an empty new-format file when resetting an old/corrupt one.
-  if (staleFile) persist(map);
+  // Rewrite the file in the current format after a reset or a points migration.
+  if (needsPersist) persist(map);
   return map;
 }
 
