@@ -6,7 +6,18 @@ import type { GameRoom, LeaderboardEntry, PlayerStatRecord } from '@rozpisnyi-po
 // ─── Persistence location & schema version ───────────────────────────────────────
 
 const DEFAULT_STATS_FILE = resolve(process.cwd(), 'data', 'player-stats.json');
-let statsFile = process.env.PLAYER_STATS_FILE ?? DEFAULT_STATS_FILE;
+
+/**
+ * Resolve the configured stats-file path.
+ * Priority: STATS_FILE env → legacy PLAYER_STATS_FILE env → default path.
+ * The default is unchanged, so existing production keeps its current file; a
+ * second (graphic-ui) instance points STATS_FILE at its own file.
+ */
+function configuredStatsFile(): string {
+  return process.env.STATS_FILE ?? process.env.PLAYER_STATS_FILE ?? DEFAULT_STATS_FILE;
+}
+
+let statsFile = configuredStatsFile();
 
 /**
  * Rating schema version. Bumped whenever the rating rules change in a way that
@@ -203,8 +214,8 @@ export function _setStatsFileForTest(file: string): void {
   records = null;
 }
 
-/** Reset to the default file and drop the cache. Test-only. */
+/** Reset to the configured (env/default) file and drop the cache. Test-only. */
 export function _resetStatsForTest(): void {
-  statsFile = process.env.PLAYER_STATS_FILE ?? DEFAULT_STATS_FILE;
+  statsFile = configuredStatsFile();
   records = null;
 }
