@@ -1,36 +1,70 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /**
- * Test-Lab-only jumpscare. Flashes a full-screen image for ~850 ms once per deal
- * when the Joker (Жопа) was dealt to any player. Renders nothing in normal games —
- * it is only mounted by GameScreen when `room.mode === 'test'`.
+ * Test-Lab-only jumpscare. When `active` becomes true for a new deal, it waits
+ * `delayMs`, then flashes a full-screen image for `durationMs`, exactly once per
+ * deal. Renders nothing in normal games — GameScreen only mounts it when
+ * `room.mode === 'test'`.
  *
- * "Once per deal" is enforced by keying the effect on `dealKey` (the round index):
- * the effect only re-runs when a new deal arrives, never on incidental re-renders.
+ * `active` is the *personal* trigger computed by the parent:
+ *   isTestLab && (my own hand contains the Joker) && (my hand is visible).
+ * So it fires only for the player who actually holds the Joker, and only once
+ * the hand is revealed (after the Темна/Відкрита choice, bid, or — for
+ * no-trump/misere/golden — right after the deal).
+ *
+ * "Once per deal" is enforced with a ref keyed on `dealKey` (the round index):
+ * after firing for a deal it never re-arms for that same deal, no matter how
+ * many times the component re-renders or `active` toggles.
  */
 
-const DURATION_MS = 850;
-
 interface Props {
-  /** Round index — changes on every new deal so the screamer re-arms exactly once. */
+  /** True only when THIS player should see the screamer this deal (see above). */
+  active: boolean;
+  /** Round index — changes on every new deal so the screamer re-arms once. */
   dealKey: number;
-  /** True when the Joker was dealt to some player this deal. */
-  jokerDealt: boolean;
+  /** Delay after `active` becomes true before the image shows. Default 2000 ms. */
+  delayMs?: number;
+  /** How long the image stays visible. Default 850 ms. */
+  durationMs?: number;
 }
 
-export default function JokerScreamer({ dealKey, jokerDealt }: Props) {
+export default function JokerScreamer({
+  active,
+  dealKey,
+  delayMs = 2000,
+  durationMs = 850,
+}: Props) {
   const [visible, setVisible] = useState(false);
+  const firedForDealRef = useRef<number | null>(null);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
+  const clearTimers = () => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  };
+
+  // New deal → reset arming state and hide any in-flight overlay.
   useEffect(() => {
-    if (!jokerDealt) return;
-    setVisible(true);
-    const t = setTimeout(() => setVisible(false), DURATION_MS);
-    // Cleanup runs on the next deal and on unmount → overlay never gets stuck.
-    return () => {
-      clearTimeout(t);
-      setVisible(false);
-    };
-  }, [dealKey, jokerDealt]);
+    firedForDealRef.current = null;
+    setVisible(false);
+    return clearTimers;
+  }, [dealKey]);
+
+  // Arm exactly once per deal, the moment `active` becomes true.
+  useEffect(() => {
+    if (!active) return;
+    if (firedForDealRef.current === dealKey) return; // already fired this deal
+    firedForDealRef.current = dealKey;
+    const showT = setTimeout(() => {
+      setVisible(true);
+      const hideT = setTimeout(() => setVisible(false), durationMs);
+      timersRef.current.push(hideT);
+    }, delayMs);
+    timersRef.current.push(showT);
+  }, [active, dealKey, delayMs, durationMs]);
+
+  // Belt-and-braces: never leave a timer running after unmount.
+  useEffect(() => clearTimers, []);
 
   if (!visible) return null;
 

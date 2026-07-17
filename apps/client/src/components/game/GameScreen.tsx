@@ -330,8 +330,10 @@ export default function GameScreen({
       {/* ── Joker screamer (Test Lab only) ───────────────────────────────── */}
       {room.mode === 'test' && (
         <JokerScreamer
+          active={hand.some(c => c.isJoker) && showHand}
           dealKey={ar.roundIndex}
-          jokerDealt={ar.jokerHolderPlayerId !== null}
+          delayMs={2000}
+          durationMs={850}
         />
       )}
 
