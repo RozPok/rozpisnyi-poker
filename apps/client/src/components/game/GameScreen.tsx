@@ -29,6 +29,7 @@ import OpponentSeat from './OpponentSeat.tsx';
 import TableCenter  from './TableCenter.tsx';
 import HandArea     from './HandArea.tsx';
 import BidPanel     from './BidPanel.tsx';
+import JokerScreamer from './JokerScreamer.tsx';
 import ScoreSheetModal from '../ScoreSheetModal.tsx';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -325,6 +326,14 @@ export default function GameScreen({
 
   return (
     <div className="gs-root">
+
+      {/* ── Joker screamer (Test Lab only) ───────────────────────────────── */}
+      {room.mode === 'test' && (
+        <JokerScreamer
+          dealKey={ar.roundIndex}
+          jokerDealt={ar.jokerHolderPlayerId !== null}
+        />
+      )}
 
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
       <TopBar room={room} myId={myId} onMenuOpen={() => setMenuOpen(true)} />

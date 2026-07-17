@@ -355,6 +355,37 @@ body {
   backdrop-filter: blur(4px);
 }
 
+/* ─── Joker screamer (Test Lab only) ───────────────────────────────────────── */
+
+.joker-screamer {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647; /* above every other overlay */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(6px);
+  pointer-events: none; /* no interaction, purely visual */
+  animation: joker-screamer-in 90ms ease-out;
+}
+
+.joker-screamer img {
+  max-width: 92vw;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+@keyframes joker-screamer-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .joker-screamer { animation: none; }
+}
+
 /* ─── Game started banner ──────────────────────────────────────────────────── */
 
 .game-started-banner {
